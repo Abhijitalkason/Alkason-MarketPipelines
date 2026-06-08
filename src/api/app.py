@@ -82,7 +82,7 @@ class PredictRequest(BaseModel):
     def validate_symbol(cls, v: str) -> str:
         v = v.upper().strip()
         if not (v.endswith(".NS") or v.endswith(".BO")):
-            raise ValueError("Symbol must end with .NS (NSE) or .BO (BSE)")
+            v = v + ".NS"  # auto-append NSE suffix when omitted
         return v
 
 
@@ -246,7 +246,9 @@ async def recommendation(symbol: str):
 
 @app.get("/sentiment/{symbol}", response_model=SentimentResponse, tags=["SLM"])
 async def sentiment(symbol: str):
-    symbol = symbol.upper()
+    symbol = symbol.upper().strip()
+    if not (symbol.endswith(".NS") or symbol.endswith(".BO")):
+        symbol = symbol + ".NS"
     from src.slm.sentiment import get_live_sentiment
     sent = get_live_sentiment(symbol)
     return SentimentResponse(
