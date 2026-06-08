@@ -6,6 +6,7 @@ stocks:
     - INFY.NS
     - HDFCBANK.NS
     - WIPRO.NS
+    - BPCL.NS
   period: 5y
   interval: 1d
   provider: yfinance          # OpenBB provider backend
