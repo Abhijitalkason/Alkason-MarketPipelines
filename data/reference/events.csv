@@ -1,0 +1,7 @@
+# Event blackout calendar — consumed by src/intraday/risk.py (parsed with comment='#').
+# type ∈ {expiry, results, rbi, fed, budget}. symbol empty = market-wide.
+# Weekly index expiry (Thursdays) is auto-flagged by risk.py from config —
+# only ADD non-recurring events here. Populate results dates from NSE
+# corporate announcements before Gate 3 backtest.
+date,type,symbol
+2026-02-01,budget,

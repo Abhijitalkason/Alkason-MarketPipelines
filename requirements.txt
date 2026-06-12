@@ -77,3 +77,7 @@ pyyaml==6.0.3
 python-dotenv==1.2.2
 tqdm>=4.67.0
 requests>=2.32.0
+
+# ── PLAN v3 — intraday selective signal system ────────────────────────
+catboost>=1.2.7          # flow model (PLAN_v3 Section 10.2)
+pyarrow>=16.0            # parquet bar store

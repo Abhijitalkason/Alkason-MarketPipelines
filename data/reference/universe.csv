@@ -1,0 +1,51 @@
+# STARTER universe — NSE large caps (NIFTY50 core + existing v1 names).
+# Replace/extend with the official NSE-200 constituent list (ind_nifty200list.csv
+# from niftyindices.com) before Gate 1. Parsed with comment='#'.
+symbol,name,sector
+RELIANCE,Reliance Industries,Energy
+TCS,Tata Consultancy Services,IT
+HDFCBANK,HDFC Bank,Banking
+ICICIBANK,ICICI Bank,Banking
+INFY,Infosys,IT
+SBIN,State Bank of India,Banking
+BHARTIARTL,Bharti Airtel,Telecom
+ITC,ITC,FMCG
+LT,Larsen & Toubro,Infrastructure
+KOTAKBANK,Kotak Mahindra Bank,Banking
+AXISBANK,Axis Bank,Banking
+BAJFINANCE,Bajaj Finance,NBFC
+MARUTI,Maruti Suzuki,Auto
+TITAN,Titan Company,Consumer
+WIPRO,Wipro,IT
+BPCL,Bharat Petroleum,Energy
+HINDUNILVR,Hindustan Unilever,FMCG
+ASIANPAINT,Asian Paints,Consumer
+HCLTECH,HCL Technologies,IT
+SUNPHARMA,Sun Pharma,Pharma
+TATAMOTORS,Tata Motors,Auto
+TATASTEEL,Tata Steel,Metals
+NTPC,NTPC,Power
+POWERGRID,Power Grid,Power
+ULTRACEMCO,UltraTech Cement,Cement
+M&M,Mahindra & Mahindra,Auto
+JSWSTEEL,JSW Steel,Metals
+ONGC,ONGC,Energy
+COALINDIA,Coal India,Mining
+ADANIENT,Adani Enterprises,Conglomerate
+ADANIPORTS,Adani Ports,Infrastructure
+TECHM,Tech Mahindra,IT
+NESTLEIND,Nestle India,FMCG
+GRASIM,Grasim Industries,Cement
+HINDALCO,Hindalco,Metals
+DRREDDY,Dr Reddys Labs,Pharma
+CIPLA,Cipla,Pharma
+BAJAJFINSV,Bajaj Finserv,NBFC
+INDUSINDBK,IndusInd Bank,Banking
+EICHERMOT,Eicher Motors,Auto
+HEROMOTOCO,Hero MotoCorp,Auto
+APOLLOHOSP,Apollo Hospitals,Healthcare
+DIVISLAB,Divis Labs,Pharma
+TATACONSUM,Tata Consumer,FMCG
+BRITANNIA,Britannia,FMCG
+SBILIFE,SBI Life,Insurance
+HDFCLIFE,HDFC Life,Insurance

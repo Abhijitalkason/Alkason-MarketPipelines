@@ -161,6 +161,51 @@ def cmd_full_pipeline(args, cfg):
     logger.info("Full pipeline complete.")
 
 
+# ── PLAN v3 — intraday selective signal system (PLAN_v3.md) ──────────
+
+def cmd_backfill(args, cfg):
+    from src.intraday.data_feed import backfill
+    backfill(symbols=args.symbols, years=args.years)
+
+
+def cmd_bhavcopy(args, cfg):
+    from datetime import date, timedelta
+    from src.intraday.bhavcopy import backfill_bhavcopies, fetch_fii_dii
+    from src.intraday import load_config as v3cfg
+    years = args.years or v3cfg()["data"]["backfill_years"]
+    start = date.today() - timedelta(days=int(years * 365.25))
+    backfill_bhavcopies(start, date.today())
+    fetch_fii_dii()
+
+
+def cmd_record(args, cfg):
+    from src.intraday.recorder import run
+    run()
+
+
+def cmd_screen(args, cfg):
+    from datetime import date
+    from src.intraday.screener import screen_day
+    day = date.fromisoformat(args.date) if args.date else date.today()
+    top = screen_day(day)
+    print(top.to_string(index=False))
+
+
+def cmd_backtest(args, cfg):
+    import json
+    from datetime import date, timedelta
+    from src.intraday.backtester import run_backtest
+    end = date.fromisoformat(args.end) if args.end else date.today()
+    start = date.fromisoformat(args.start) if args.start else end - timedelta(days=3 * 365)
+    report = run_backtest(start, end, stress=args.stress)
+    print(json.dumps(report, indent=2, default=str))
+
+
+def cmd_paper(args, cfg):
+    from src.intraday.paper_runner import run
+    run(capital_inr=args.capital)
+
+
 def main():
     import yaml
     cfg_path = Path(__file__).parent / "config" / "config.yaml"
@@ -192,7 +237,9 @@ Examples:
         "--mode",
         required=True,
         choices=["ingest", "validate", "features", "train", "compare",
-                 "monitor", "predict", "serve", "full-pipeline"],
+                 "monitor", "predict", "serve", "full-pipeline",
+                 # PLAN v3 intraday modes
+                 "backfill", "bhavcopy", "record", "screen", "backtest", "paper"],
         help="Pipeline mode to run",
     )
     parser.add_argument(
@@ -219,6 +266,19 @@ Examples:
         default=False,
         help="Skip AutoGluon training (faster, especially on first run)",
     )
+    # ── PLAN v3 arguments ────────────────────────────────────────────
+    parser.add_argument("--years", type=int, default=None,
+                        help="[v3 backfill/bhavcopy] years of history to download")
+    parser.add_argument("--date", type=str, default=None,
+                        help="[v3 screen] date YYYY-MM-DD (default today)")
+    parser.add_argument("--start", type=str, default=None,
+                        help="[v3 backtest] start date YYYY-MM-DD")
+    parser.add_argument("--end", type=str, default=None,
+                        help="[v3 backtest] end date YYYY-MM-DD")
+    parser.add_argument("--stress", action="store_true", default=False,
+                        help="[v3 backtest] 2x slippage stress mode (Gate 3)")
+    parser.add_argument("--capital", type=float, default=1_000_000,
+                        help="[v3 paper] paper-trading capital in INR")
 
     args = parser.parse_args()
 
@@ -232,6 +292,13 @@ Examples:
         "predict":       cmd_predict,
         "serve":         cmd_serve,
         "full-pipeline": cmd_full_pipeline,
+        # PLAN v3 intraday modes
+        "backfill":      cmd_backfill,
+        "bhavcopy":      cmd_bhavcopy,
+        "record":        cmd_record,
+        "screen":        cmd_screen,
+        "backtest":      cmd_backtest,
+        "paper":         cmd_paper,
     }
 
     dispatch[args.mode](args, cfg)
