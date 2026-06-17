@@ -1,23 +1,32 @@
-"""Intraday feature engineering (PLAN_v3 Section 9).
+"""Intraday feature engineering (PLAN_v3 §9; v3_supplementry §4) — schema v3.1.
 
 One row per (symbol, decision 15-min bar) in the entry window. Two channels:
   PRICE_FEATURES — consumed by price_model (LightGBM)
-  FLOW_FEATURES  — consumed by flow_model (CatBoost)
+  FLOW_FEATURES  — consumed by flow_model (CatBoost), each with a _present
+                   flag so imputation never masquerades as data (B-5)
 
 Rules enforced here: every rolling stat strictly trails the decision bar;
-volume/range normalized by 20-day same-time-of-day averages; no ffill across
-sessions; the schema (FEATURE_ORDER) is versioned and checked at serve time.
+FII/DII filtered strictly before the decision day (B-4); volume normalized by
+20-day same-time-of-day averages; no ffill across sessions; the schema is
+versioned and checked at every serve-time predict (H-10).
+
+Missingness policy (build_matrix):
+  flow NaN → 0.0 ONLY alongside _present=0; flow_real_share logged each build;
+  when the flow channel is required, share below the configured floor RAISES
+  FlowDataError (training on majority-imputed flow was v1's FinBERT failure).
+  Price-NaN rows are dropped but COUNTED; skip share above tolerance RAISES.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from src.intraday import ROOT, load_config
+from src.intraday import ROOT, load_config, point_in_time
 from src.intraday.bars import atr_2h, load_1min, resample
 
 logger = logging.getLogger(__name__)
@@ -34,20 +43,37 @@ PRICE_FEATURES = [
 FLOW_FEATURES = [
     "oi_change_z", "basis_pct", "delivery_z", "preopen_imbalance", "fii_5d_z",
 ]
-FEATURE_ORDER = PRICE_FEATURES + FLOW_FEATURES + ["direction"]
-SCHEMA_VERSION = "v3.0"
+FLOW_PRESENT = [f + "_present" for f in FLOW_FEATURES]
+FEATURE_ORDER = PRICE_FEATURES + FLOW_FEATURES + FLOW_PRESENT + ["direction"]
+SCHEMA_VERSION = "v3.1"
 
 
 class FeatureSchemaError(ValueError):
     pass
 
 
+class FlowDataError(RuntimeError):
+    pass
+
+
+class DatasetThinningError(RuntimeError):
+    pass
+
+
 def check_schema(df: pd.DataFrame) -> None:
-    """Serve-time guard (v1 post-mortem #5): exact column set + order."""
+    """Serve-time guard (v1 post-mortem #5 / H-10): every schema column present,
+    in order, with no NaN in price features. Called before EVERY predict —
+    backtester, paper runner, and API."""
+    missing = [c for c in FEATURE_ORDER if c not in df.columns]
+    if missing:
+        raise FeatureSchemaError(f"schema {SCHEMA_VERSION}: missing columns {missing}")
     cols = [c for c in df.columns if c in FEATURE_ORDER]
     if cols != FEATURE_ORDER:
+        raise FeatureSchemaError(f"schema {SCHEMA_VERSION}: column order mismatch: {cols}")
+    bad = df[PRICE_FEATURES].isna().any()
+    if bad.any():
         raise FeatureSchemaError(
-            f"feature schema mismatch vs {SCHEMA_VERSION}: got {cols}"
+            f"schema {SCHEMA_VERSION}: NaN in price features {list(bad[bad].index)}"
         )
 
 
@@ -59,13 +85,32 @@ def _rsi(close: pd.Series, n: int = 14) -> pd.Series:
     return 100 - 100 / (1 + rs)
 
 
-def _flow_row(symbol: str, day: date) -> dict:
-    """Flow features from the latest bhavcopy strictly BEFORE `day`."""
-    cfg = load_config()
-    bdir = ROOT / cfg["data"]["bhavcopy_path"]
-    out = {k: np.nan for k in FLOW_FEATURES}
+def _bhav_dir() -> Path:
+    p = Path(load_config()["data"]["bhavcopy_path"])
+    return p if p.is_absolute() else ROOT / p
 
-    # futures OI + basis: trailing 20 sessions for z-score
+
+def _preopen_dir() -> Path:
+    p = Path(load_config()["data"]["preopen_path"])
+    return p if p.is_absolute() else ROOT / p
+
+
+def _flow_row(symbol: str, day: date) -> dict:
+    """Flow features for `day`, with a _present flag per feature.
+
+    Point-in-time guarantees:
+      - bhavcopy inputs read strictly-prior-day files only;
+      - pre-open snapshot filtered to capture_ts ≤ 09:30 of `day`;
+      - FII/DII rows filtered to date strictly before `day` (B-4 fix).
+    """
+    out: dict[str, float] = {}
+    for k in FLOW_FEATURES:
+        out[k] = np.nan
+        out[k + "_present"] = 0.0
+    bdir = _bhav_dir()
+    decision_floor = pd.Timestamp(datetime.combine(day, time(9, 30)))
+
+    # futures OI + basis: trailing 20 sessions for z-score (strictly-prior files)
     oi_hist, basis = [], np.nan
     for d in pd.bdate_range(end=day - timedelta(days=1), periods=20).date:
         p = bdir / f"fo_{d.isoformat()}.parquet"
@@ -77,52 +122,73 @@ def _flow_row(symbol: str, day: date) -> dict:
                 basis = float(row["basis_pct"].iloc[0])
     if len(oi_hist) >= 5:
         s = pd.Series(oi_hist)
-        out["oi_change_z"] = float((s.iloc[-1] - s.mean()) / (s.std() or 1.0))
-        out["basis_pct"] = basis
+        std = float(s.std())
+        if std > 0:
+            out["oi_change_z"] = float((s.iloc[-1] - s.mean()) / std)
+            out["oi_change_z_present"] = 1.0
+        if np.isfinite(basis):
+            out["basis_pct"] = basis
+            out["basis_pct_present"] = 1.0
 
-    # delivery % z (same computation as screener, kept local to avoid coupling)
+    # delivery % z (strictly-prior files)
     dvals = []
     for d in pd.bdate_range(end=day - timedelta(days=1), periods=20).date:
         p = bdir / f"eq_{d.isoformat()}.parquet"
         if p.exists():
             df = pd.read_parquet(p, columns=["symbol", "deliv_per"])
             row = df[df.symbol == symbol]
-            if not row.empty:
+            if not row.empty and pd.notna(row["deliv_per"].iloc[0]):
                 dvals.append(float(row["deliv_per"].iloc[0]))
     if len(dvals) >= 5:
         s = pd.Series(dvals)
-        out["delivery_z"] = float((s.iloc[-1] - s.mean()) / (s.std() or 1.0))
+        std = float(s.std())
+        if std > 0:
+            out["delivery_z"] = float((s.iloc[-1] - s.mean()) / std)
+            out["delivery_z_present"] = 1.0
 
-    pre = ROOT / cfg["data"]["preopen_path"] / f"{day.isoformat()}.parquet"
+    # pre-open imbalance — same-day file, PIT-filtered on capture_ts
+    pre = _preopen_dir() / f"{day.isoformat()}.parquet"
     if pre.exists():
-        df = pd.read_parquet(pre)
+        df = point_in_time(pd.read_parquet(pre), day, decision_floor, date_col="__none__")
         row = df[df.symbol == symbol]
         if not row.empty and pd.notna(row["imbalance"].iloc[0]):
             out["preopen_imbalance"] = float(row["imbalance"].iloc[0])
+            out["preopen_imbalance_present"] = 1.0
 
+    # FII/DII 5-day net z — STRICTLY before `day` (B-4). Parse failures RAISE;
+    # only file absence degrades (to NaN + present=0).
     fii = bdir / "fii_dii.parquet"
     if fii.exists():
-        try:
-            df = pd.read_parquet(fii)
-            num = df.select_dtypes("number")
-            if len(num) >= 5:
-                col = num.columns[-1]
-                s = num[col].tail(20)
-                out["fii_5d_z"] = float((s.tail(5).mean() - s.mean()) / (s.std() or 1.0))
-        except Exception as e:  # noqa: BLE001
-            logger.warning("fii_dii parse failed: %s", e)
+        df = pd.read_parquet(fii)
+        if "date" not in df.columns or "fii_net_cr" not in df.columns:
+            raise FlowDataError(
+                "fii_dii.parquet lacks date/fii_net_cr columns — run "
+                "`python main.py --mode bhavcopy` to rebuild (schema migrated in v3.1)"
+            )
+        df = df[pd.to_datetime(df["date"]) < pd.Timestamp(day)].sort_values("date")
+        s = df["fii_net_cr"].tail(20)
+        if len(s) >= 5:
+            std = float(s.std())
+            if std > 0:
+                out["fii_5d_z"] = float((s.tail(5).mean() - s.mean()) / std)
+                out["fii_5d_z_present"] = 1.0
     return out
 
 
 def features_for_day(symbol: str, day: date, direction: int = 1,
                      df_1min: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Feature rows for every decision bar of one symbol-day (entry window only)."""
+    """Feature rows for every decision bar of one symbol-day (entry window only).
+
+    df_1min injection is the live-path contract (B-2): the paper runner passes
+    history + the recorder's provisional bars for today; backtest/training load
+    from the store. Same function either way — train == serve by construction.
+    """
     cfg = load_config()
     geo = cfg["geometry"]
     if df_1min is None:
         df_1min = load_1min(symbol, day - timedelta(days=45), day)
 
-    df5 = resample(df_1min, "5min")
+    df5 = resample(df_1min, cfg["data"]["bar_freq_feature"])
     atr = atr_2h(df5)
     today1 = df_1min[df_1min.index.date == day]
     if today1.empty:
@@ -134,11 +200,9 @@ def features_for_day(symbol: str, day: date, direction: int = 1,
         return pd.DataFrame()
     prev_close = float(df_1min[df_1min.index.date == prior_days[-1]]["close"].iloc[-1])
 
-    # 20-day same-time-of-day cumulative volume norm
-    hist = df_1min[df_1min.index.date.astype("O").isin(prior_days[-20:])]
-    cumvol_norm = hist.groupby([hist.index.date, hist.index.time])["volume"].sum() \
-                      .groupby(level=1).mean().groupby(level=0).cumsum() if False else None
-    # simpler + correct: per-day cumvol by time, averaged across days
+    # 20-day same-time-of-day cumulative volume norm (U-curve normalization)
+    day_index = pd.Series(df_1min.index.date, index=df_1min.index)
+    hist = df_1min[day_index.isin(prior_days[-20:]).to_numpy()]
     cv = hist.assign(d=hist.index.date, t=hist.index.time)
     cv["cum"] = cv.groupby("d")["volume"].cumsum()
     cumvol_by_time = cv.groupby("t")["cum"].mean()
@@ -212,27 +276,78 @@ def features_for_day(symbol: str, day: date, direction: int = 1,
             "direction": float(direction),
             **flow,
         })
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    meta = ["symbol", "ts", "date"]
+    return df[meta + FEATURE_ORDER]      # canonical column order for check_schema
 
 
-def build_matrix(plan: pd.DataFrame) -> pd.DataFrame:
+def impute_flow(df: pd.DataFrame) -> pd.DataFrame:
+    """flow NaN → 0.0 ONLY alongside its _present flag (already 0 for imputed
+    values) — information preserved (B-5). Returns a copy."""
+    out = df.copy()
+    out[FLOW_FEATURES] = out[FLOW_FEATURES].fillna(0.0)
+    return out
+
+
+def flow_real_share(df: pd.DataFrame) -> float:
+    """Mean over rows of mean(FLOW_PRESENT) — the flow channel's real-data share."""
+    if df.empty:
+        return 0.0
+    return float(df[FLOW_PRESENT].mean(axis=1).mean())
+
+
+def build_matrix(plan: pd.DataFrame, require_flow: bool | None = None) -> pd.DataFrame:
     """Feature matrix for a screen plan: rows [date, symbol, direction].
-    Drops rows with missing PRICE features (logged); flow NaNs filled 0
-    (absence of flow data is itself information-neutral)."""
-    frames = []
+
+    require_flow defaults to config gate.flow_model_active: when the flow
+    channel is in use, a real-data share below the floor RAISES FlowDataError;
+    in price-only mode it is logged (the trainer uses the logged share to
+    decide activation). Row skips are counted; over-tolerance RAISES (M-1).
+    """
+    cfg = load_config()
+    if require_flow is None:
+        require_flow = bool(cfg["gate"]["flow_model_active"])
+
+    frames, failed = [], 0
     for _, r in plan.iterrows():
         try:
             f = features_for_day(r["symbol"], r["date"], int(r["direction"]))
             if not f.empty:
                 frames.append(f)
-        except Exception as e:  # noqa: BLE001
+        except FlowDataError:
+            raise  # structural problem — never count this as a row skip
+        except Exception as e:  # noqa: BLE001 — counted, raises over tolerance below
+            failed += 1
             logger.warning("features: %s %s skipped (%s)", r["symbol"], r["date"], e)
+    if failed and failed > len(plan) * cfg["data"]["max_skip_share"]:
+        raise DatasetThinningError(
+            f"{failed}/{len(plan)} symbol-days failed feature build "
+            f"(> {cfg['data']['max_skip_share']:.0%} tolerance) — investigate the bar store"
+        )
     if not frames:
         return pd.DataFrame()
     out = pd.concat(frames, ignore_index=True)
+
     n0 = len(out)
     out = out.dropna(subset=PRICE_FEATURES)
-    out[FLOW_FEATURES] = out[FLOW_FEATURES].fillna(0.0)
-    if n0 - len(out):
-        logger.info("features: dropped %d/%d rows with missing price features", n0 - len(out), n0)
-    return out
+    dropped = n0 - len(out)
+    if dropped and dropped > n0 * cfg["data"]["max_skip_share"]:
+        raise DatasetThinningError(
+            f"{dropped}/{n0} rows dropped for missing price features "
+            f"(> {cfg['data']['max_skip_share']:.0%} tolerance)"
+        )
+    if dropped:
+        logger.info("features: dropped %d/%d rows with missing price features", dropped, n0)
+
+    share = flow_real_share(out)
+    logger.info("features: flow_real_share=%.3f over %d rows", share, len(out))
+    floor = 1.0 - cfg["data"]["max_flow_missing_share"]
+    if require_flow and share < floor:
+        raise FlowDataError(
+            f"flow_real_share {share:.2f} < {floor:.2f} — training the flow channel on "
+            f"majority-imputed data is the v1 FinBERT failure; backfill bhavcopies first "
+            f"or set gate.flow_model_active=false"
+        )
+    return impute_flow(out)

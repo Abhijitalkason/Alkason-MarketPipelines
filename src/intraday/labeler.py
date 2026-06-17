@@ -1,4 +1,4 @@
-"""Triple-barrier labeling on 1-min paths (PLAN_v3 Section 8).
+"""Triple-barrier labeling on 1-min paths (PLAN_v3 §8; v3_supplementry §4.5).
 
 For each candidate (symbol, decision bar) in the entry window:
   entry  = next 15-min bar open (realistic fill)
@@ -7,6 +7,7 @@ For each candidate (symbol, decision bar) in the entry window:
   label  = 1 target-first | 0 stop-first | sign(PnL) at time barrier
 
 Conservative tie-break: if one 1-min bar spans BOTH barriers → counted as stop.
+Geometry (a, b) is read from config so geometry_study can sweep it.
 """
 
 from __future__ import annotations
@@ -57,24 +58,29 @@ def _resolve_path(path: pd.DataFrame, direction: int, entry: float,
 
 
 def label_day(symbol: str, day: date, directions: dict[pd.Timestamp, int] | None = None,
-              df_1min: pd.DataFrame | None = None) -> list[TradeOutcome]:
+              df_1min: pd.DataFrame | None = None,
+              geometry: dict | None = None) -> list[TradeOutcome]:
     """Label every decision bar in the entry window for one symbol-day.
 
-    directions: optional {decision_bar_ts: ±1} from the screener; default long
-    (geometry tuning and model training run both directions via the screener hint).
+    directions: optional {decision_bar_ts: ±1} from the screener; default long.
+    geometry:   optional {target_atr, stop_atr, ...} override for geometry_study;
+                config geometry otherwise.
     """
     cfg = load_config()
-    geo = cfg["geometry"]
+    geo = geometry or cfg["geometry"]
     if df_1min is None:
         # ATR needs ~5 prior sessions of bars
         df_1min = load_1min(symbol, day - timedelta(days=10), day)
-    df5 = resample(df_1min, "5min")
+    df5 = resample(df_1min, cfg["data"]["bar_freq_feature"])
     atr = atr_2h(df5)
 
-    w_start = time.fromisoformat(geo["entry_window"][0])
-    w_end = time.fromisoformat(geo["entry_window"][1])
-    squareoff = time.fromisoformat(geo["squareoff"])
-    df15 = resample(df_1min[df_1min.index.date == day], "15min")
+    w_start = time.fromisoformat(geo["entry_window"][0] if "entry_window" in geo
+                                 else cfg["geometry"]["entry_window"][0])
+    w_end = time.fromisoformat(geo["entry_window"][1] if "entry_window" in geo
+                               else cfg["geometry"]["entry_window"][1])
+    squareoff = time.fromisoformat(cfg["geometry"]["squareoff"])
+    t_barrier_h = cfg["geometry"]["time_barrier_hours"]
+    df15 = resample(df_1min[df_1min.index.date == day], cfg["data"]["bar_freq_decision"])
 
     outcomes: list[TradeOutcome] = []
     decision_bars = df15[(df15.index.time >= w_start) & (df15.index.time < w_end)]
@@ -90,12 +96,14 @@ def label_day(symbol: str, day: date, directions: dict[pd.Timestamp, int] | None
         if atr_known.empty:
             continue
         a = float(atr_known.iloc[-1])
+        if a <= 0:
+            continue
         direction = (directions or {}).get(bar_ts, 1)
         target = entry + direction * geo["target_atr"] * a
         stop = entry - direction * geo["stop_atr"] * a
 
         t_bar = min(
-            entry_ts + pd.Timedelta(hours=geo["time_barrier_hours"]),
+            entry_ts + pd.Timedelta(hours=t_barrier_h),
             pd.Timestamp(datetime.combine(day, squareoff)),
         )
         path = df_1min[(df_1min.index >= entry_ts) & (df_1min.index <= t_bar)]
@@ -117,7 +125,7 @@ def outcomes_frame(outcomes: list[TradeOutcome]) -> pd.DataFrame:
     return pd.DataFrame([o.__dict__ for o in outcomes])
 
 
-def geometric_baseline() -> float:
+def geometric_baseline(geometry: dict | None = None) -> float:
     """b/(a+b) — the no-edge win-rate floor for the configured geometry."""
-    geo = load_config()["geometry"]
+    geo = geometry or load_config()["geometry"]
     return geo["stop_atr"] / (geo["target_atr"] + geo["stop_atr"])

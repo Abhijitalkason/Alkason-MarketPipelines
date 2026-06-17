@@ -28,21 +28,22 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ../models:/app/models
+      # API serves models + reads reports/reference read-only; it never writes
+      # data and the broker token never enters this container (host-only).
+      - ../models:/app/models:ro
       - ../mlruns:/app/mlruns
-      - ../data:/app/data
       - ../reports:/app/reports
+      - ../data/reference:/app/data/reference:ro
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - OLLAMA_BASE_URL=http://ollama:11434
-    env_file:
-      - ../.env
+      - V3_API_KEY=${V3_API_KEY}
     depends_on:
       mlflow:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import os,urllib.request; req=urllib.request.Request('http://localhost:8000/health', headers={'X-API-Key': os.environ['V3_API_KEY']}); urllib.request.urlopen(req)"]
       interval: 30s
       timeout: 10s
       retries: 5

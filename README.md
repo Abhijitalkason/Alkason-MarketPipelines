@@ -1,193 +1,89 @@
-# AI-MLOps Stock Prediction System
+# Intraday Selective Signal System (v3) — NSE
 
-Production-grade end-to-end MLOps pipeline for NSE/BSE stock prediction.
+A 2–3 hour intraday **selective** trading-signal system for NSE large caps.
+Entries 09:30–11:00 IST, time barrier entry+3h, hard square-off 14:45, always
+flat overnight. See [PLAN_v3.md](PLAN_v3.md) and
+[v3_supplementry.md](v3_supplementry.md) for the full specification.
 
-**Stack:** OpenBB · LightGBM · XGBoost · PyTorch LSTM · Amazon Chronos-2 · AutoGluon · FinBERT · IBM Granite 4.1-3B · MLflow 3.12 · FastAPI · Evidently AI · DVC
+**Stack:** Upstox/NSE data · LightGBM (price) + CatBoost (flow) · weighted blend
++ isotonic calibration · custom Adaptive Conformal Inference gate · triple-barrier
+labels · MLflow registry · Evidently drift · DVC · FastAPI · IBM Granite (Ollama).
 
----
+## The 89% contract (one paragraph)
 
-## Quick Start
+The win rate is **engineered by barrier geometry**, not demanded from prediction:
+at target `a`·ATR / stop `b`·ATR the no-edge win rate is `b/(a+b)`, so wide stops
+buy a high win rate at exactly fair price (pre-cost EV = 0). Profit comes from the
+**expectancy identity** `EV = δ·(a+b) − c`: the model's only job is to find the
+2–6 setups/day where its calibrated P(win) clears the conformal fire threshold;
+everything else is silence. Both gates must hold — **win rate ≥ 89% AND post-cost
+expectancy ≥ +0.05%/trade** — and the kill-switch metric is expectancy, not win
+rate, because at this geometry win rate stays high right up until the system dies.
 
-### 1. Install dependencies
-```bash
-pip install -r requirements.txt
+## CLI (config_v3.yaml only)
+
+```
+python main.py --mode backfill          # 1-min bar history (Upstox)
+                  bhavcopy               # NSE EOD: equity/F&O/FII-DII + raise-on-miss
+                  corp-actions           # corporate-action factor table
+                  record                 # live session recorder (08:55→close)
+                  screen [--date D]      # 09:30 morning momentum screen
+                  geometry-study         # Phase-3 grid → Gate 2
+                  backtest [--stress] [--tune]   # purged walk-forward → Gate 3
+                  train-v3 [--end D] [--months N]  # production train → Staging
+                  promote --version N --confirm    # Staging → Production
+                  rollback --confirm
+                  recalibrate            # rolling 60-day isotonic refit
+                  paper --capital N      # Gate-4 paper loop (≥22 sessions)
+                  drift                  # Evidently drift → ACI recalib → halt
+                  gates [--start S --end E]        # executable Gates 0/3/4
+                  serve                  # FastAPI (requires V3_API_KEY)
 ```
 
-### 2. Copy environment file
-```bash
-cp .env.example .env
-# Edit .env if you have IBM watsonx or NewsAPI credentials
-```
+## API (every endpoint needs `X-API-Key`)
 
-### 3. Run full pipeline (manual mode — no Docker needed)
-```bash
-python main.py --mode ingest        # Download 5y OHLCV data for all stocks
-python main.py --mode features      # Engineer 60+ features + sentiment labels
-python main.py --mode train --trainer manual --skip-autogluon   # Train all models
-python main.py --mode compare       # View side-by-side comparison table
-python main.py --mode predict --symbol RELIANCE.NS              # Single prediction
-```
-
-### 4. Start FastAPI server
-```bash
-python main.py --mode serve
-# → API running at http://localhost:8000
-# → Docs at http://localhost:8000/docs
-```
-
-### 5. Full pipeline in one command
-```bash
-python main.py --mode full-pipeline --trainer manual
-```
-
----
-
-## CLI Reference
-
-| Command | Description |
+| Endpoint | Returns |
 |---|---|
-| `--mode ingest` | Download OHLCV data via OpenBB / yfinance |
-| `--mode validate` | Pandera data quality checks |
-| `--mode features` | Engineer 60+ technical indicators + FinBERT sentiment |
-| `--mode train --trainer manual` | Train all models, save `.pkl`/`.pt` locally |
-| `--mode train --trainer mlflow` | Train + log everything to MLflow |
-| `--mode compare` | Side-by-side model comparison table |
-| `--mode monitor` | Evidently AI drift report |
-| `--mode predict --symbol X` | Single stock prediction (CLI output) |
-| `--mode serve` | Start FastAPI service |
-| `--mode full-pipeline` | Ingest → Features → Train → Compare |
+| `GET /health` | model source/age, gate τ + age, halt status, journal chain OK |
+| `GET /signals/today` | today's fills/exits/explanations (from the journal) |
+| `GET /signals/history?days=N` | past signals + rolling win rate/expectancy/drawdown |
+| `GET /screen/today` | the 09:30 screen + scores + excluded symbols |
+| `GET /performance` | rolling metrics vs gate thresholds + per-symbol coverage |
+| `GET /drift` | last drift report + last ACI recalibration |
+| `POST /backtest` | background job (`GET /backtest/{job_id}` for status) |
 
-**Common flags:**
-```bash
---symbols RELIANCE.NS TCS.NS    # Override stock list
---symbol RELIANCE.NS            # Single stock
---trainer manual|mlflow         # Training mode
---skip-autogluon                # Skip AutoGluon (faster first run)
-```
+The API loads the **Production** registry bundle at startup (fallback `models/v3/`),
+runs inference off the event loop, and checks the feature schema before every
+predict. No model-mutating endpoint exists — training/promotion are CLI + registry.
 
----
+## Acceptance gates (`reports/v3/gates/`, all executable)
 
-## API Endpoints
-
-| Method | Endpoint | Description |
+| Gate | Test | Pass |
 |---|---|---|
-| GET | `/health` | Service health + loaded models |
-| GET | `/models` | List all trained model artifacts |
-| POST | `/predict` | `{"symbol": "RELIANCE.NS"}` → prediction |
-| POST | `/predict/batch` | Multiple symbols at once |
-| GET | `/recommendation/{symbol}` | Signal + confidence + explanation |
-| GET | `/sentiment/{symbol}` | Live FinBERT news sentiment |
-| POST | `/ask` | `{"query": "Which stocks to buy today?"}` |
-| GET | `/comparison` | All models performance JSON |
-| GET | `/drift` | Latest Evidently AI drift status |
-| POST | `/retrain` | Trigger background retraining |
+| 0 Engineering | pytest suite + dead-control sweep + coverage ≥ 85% | all green |
+| 1 Data | ≥3y bars for PIT universe + reconcile + bhavcopy cross-check | mismatch <0.1% |
+| 2 Label/geometry | geometry grid on train folds | baseline ≥86%, δ ≤ 4 pts |
+| 3 Backtest | base + 2× stress, full metric contract | win ≥89% ∧ EV ≥+0.05% ∧ no leakage/subsidy ∧ calib ≤2pts |
+| 4 Paper | ≥22 sessions | win-rate gap ≤3 pts, positive expectancy |
+| 5 Capital | COMPLIANCE checklist + 1 month smallest size | kill switches clean |
 
----
+## Tests
 
-## Project Structure
+`pytest` — deterministic synthetic fixtures, no network. The load-bearing test is
+`tests/test_features.py::test_no_lookahead_property` (would catch B-4). The
+dead-control + dead-import sweeps (`tests/test_dead_controls.py`) fail if any
+control loses its live call site or any v1 module is still referenced.
 
-```
-AI-MLOps-Solution/
-├── config/config.yaml          ← All settings (stocks, thresholds, model params)
-├── src/
-│   ├── data/                   ← ingestion, validation, feature engineering
-│   ├── slm/                    ← FinBERT sentiment, Granite explainer, news scraper
-│   ├── models/                 ← LightGBM, XGBoost, LSTM, Chronos-2, AutoGluon, Ensemble
-│   ├── training/               ← manual_trainer, mlflow_trainer
-│   ├── evaluation/             ← evaluator, Evidently monitoring
-│   └── api/app.py              ← FastAPI service
-├── docker/                     ← Dockerfiles + docker-compose.yaml
-├── models/manual/              ← Saved .pkl / .pt artifacts (DVC-tracked)
-├── data/                       ← raw CSVs, processed Parquet, news cache
-├── reports/                    ← comparison CSVs, drift HTML reports
-├── notebooks/exploration.ipynb ← EDA + SHAP + Chronos-2 demo
-├── main.py                     ← CLI entry point
-└── requirements.txt
-```
+## Operations
 
----
+[RUNBOOK.md](RUNBOOK.md) — token refresh, session start/stop, restart-resume,
+halt clearance, promotion/rollback, drift response, holiday maintenance.
+[COMPLIANCE.md](COMPLIANCE.md) — SEBI algo posture; **no live order before broker
+approval exists**.
 
-## Adding New Stocks
+## History
 
-Edit `config/config.yaml` — no code changes needed:
-```yaml
-stocks:
-  symbols:
-    - RELIANCE.NS
-    - BAJFINANCE.NS   # ← add here
-```
-
----
-
-## Model Versioning with DVC
-
-```bash
-# Initialise DVC (one-time)
-dvc init
-dvc remote add -d local_cache /tmp/dvc-cache
-
-# After each training run — DVC auto-tracks .pkl files
-git log --oneline                                          # view versions
-
-# Roll back ALL models to a previous version
-git checkout <commit-hash> && dvc checkout
-
-# Roll back a SINGLE stock's model
-git checkout <commit-hash> -- models/manual/HDFCBANK.NS_lgbm.pkl.dvc
-dvc checkout models/manual/HDFCBANK.NS_lgbm.pkl
-```
-
----
-
-## MLflow Experiment Tracking
-
-```bash
-# Start MLflow server
-docker-compose -f docker/docker-compose.yaml up mlflow -d
-# → UI at http://localhost:5000
-
-# Train with MLflow logging
-python main.py --mode train --trainer mlflow
-```
-
----
-
-## Docker Deployment (requires Docker Desktop)
-
-```bash
-docker-compose -f docker/docker-compose.yaml up
-```
-
-| Service | Port | Description |
-|---|---|---|
-| mlflow | 5000 | Experiment tracking UI |
-| api | 8000 | FastAPI + FinBERT |
-| ollama | 11434 | IBM Granite 4.1-3B explanations |
-
----
-
-## Enable IBM Granite Explanations (optional)
-
-```bash
-brew install ollama
-ollama pull granite4.1:3b
-# Restart the API — explanations will now be AI-generated
-```
-
----
-
-## Accuracy Expectations
-
-| Model | Expected Range |
-|---|---|
-| LightGBM alone | 65–72% |
-| XGBoost alone | 63–70% |
-| PyTorch LSTM | 60–68% |
-| Chronos-2 (zero-shot) | 58–66% |
-| AutoGluon baseline | 66–74% |
-| **Stacking Ensemble** | **70–82%** |
-| **+ FinBERT sentiment** | **73–85%** |
-
----
-
-*Stack: 2026 best-in-class | Python 3.12 | MLflow 3.12 | PyTorch 2.7+*
+[PLAN.md](PLAN.md) (v1, daily 5-class system) and `STATUS_2026-06-03.md` are
+retained as historical record only. v1 was fully decommissioned (its source
+tree, models, sentiment/news pipeline, and config removed); see
+[v3_supplementry.md](v3_supplementry.md) §16.

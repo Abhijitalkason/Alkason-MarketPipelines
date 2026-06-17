@@ -1,332 +1,231 @@
-"""
-FastAPI REST service — 10 endpoints for stock predictions, sentiment, and drift.
-All request/response models use Pydantic v2.
+"""v3 Serving API (PLAN_v3 §15; v3_supplementry §13).
+
+FastAPI, Pydantic v2. Every endpoint requires X-API-Key matching
+os.environ[cfg.api.api_key_env]; with no key configured the app refuses to
+start (B-8). Models load once at startup from the registry Production stage
+(fallback models/v3 with WARN); inference runs off the event loop via
+run_in_executor; check_schema runs before every predict. No model-mutating
+endpoint exists — training/promotion are CLI + registry only.
+
+The signal endpoints read the append-only journal and signals log — the live
+track record is whatever the paper/live runner has actually recorded.
 """
 
+from __future__ import annotations
+
+import asyncio
 import logging
 import os
-import pickle
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import date, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
 
-import numpy as np
-import yaml
+import pandas as pd
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel, Field, field_validator
+from fastapi import Depends, FastAPI, Header, HTTPException
+from pydantic import BaseModel
+
+from src.intraday import ROOT, load_config, now_ist, today_ist
+from src.intraday.journal import journal_days, journal_verify, read_journal
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+CFG = load_config()
+
+_state: dict = {}
+
+
+def _require_api_key_env() -> str:
+    key_env = CFG["api"]["api_key_env"]
+    key = os.environ.get(key_env, "")
+    if not key:
+        raise RuntimeError(
+            f"{key_env} not set — the serving API refuses to start without an API key (B-8)"
+        )
+    return key
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    logger.info("API started — pre-warming model cache for configured symbols ...")
-    for symbol in CFG["stocks"]["symbols"]:
-        try:
-            _load_ensemble(symbol)
-            logger.info("  Loaded model for %s", symbol)
-        except HTTPException:
-            logger.warning("  No model for %s — run training first", symbol)
+    _state["api_key"] = _require_api_key_env()
+    try:
+        from src.intraday.tracking import load_stage
+        _state["bundle"] = load_stage("Production")
+        _state["model_source"] = "registry:Production"
+    except Exception as e:  # noqa: BLE001 — local fallback with WARN
+        logger.warning("Production registry load failed (%s) — loading models/v3 files", e)
+        _state["bundle"] = _load_local_bundle()
+        _state["model_source"] = "local:models/v3"
+    from src.intraday.conformal_gate import ACIGate
+    _state["gate"] = ACIGate.load()
+    _state["started"] = now_ist()
+    logger.info("v3 API up — models from %s", _state["model_source"])
     yield
 
 
-app = FastAPI(
-    title="AI-MLOps Stock Prediction API",
-    description="Production-grade NSE/BSE stock prediction with LightGBM, XGBoost, LSTM, Chronos-2 + FinBERT sentiment",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+def _load_local_bundle():
+    from src.intraday.blend import Blender
+    from src.intraday.flow_model import FlowModel
+    from src.intraday.price_model import PriceModel
 
-# ── Config ────────────────────────────────────────────────────────────
-
-def _load_config() -> dict:
-    cfg_path = Path(__file__).parents[2] / "config" / "config.yaml"
-    with open(cfg_path) as f:
-        return yaml.safe_load(f)
-
-CFG = _load_config()
-SIGNAL_MAP = {4: "Strong Buy", 3: "Buy", 2: "Hold", 1: "Sell", 0: "Strong Sell"}
-
-# ── Model Cache (lazy loaded) ─────────────────────────────────────────
-
-_model_cache: Dict[str, object] = {}
-
-def _load_ensemble(symbol: str):
-    key = f"ensemble_{symbol}"
-    if key not in _model_cache:
-        path = Path(CFG["paths"]["manual_models"]) / f"{symbol}_ensemble.pkl"
-        if not path.exists():
-            raise HTTPException(404, detail=f"No trained model found for {symbol}. Run: python main.py --mode train --trainer manual")
-        with open(path, "rb") as f:
-            _model_cache[key] = pickle.load(f)
-    return _model_cache[key]
+    sd = ROOT / CFG["paths"]["state"]
+    pm = PriceModel.load(sd / "price_model.joblib")
+    fm = FlowModel.load(sd / "flow_model.joblib") if (sd / "flow_model.joblib").exists() else None
+    blender = Blender.load(sd / "blender.joblib")
+    return pm, fm, blender
 
 
-def _get_latest_features(symbol: str) -> tuple:
-    """Load the latest processed row for live prediction."""
-    from src.data.features import load_processed
-    df = load_processed(symbol)
-    feature_cols = [c for c in df.columns if c != "label"]
-    return df[feature_cols].values.astype(np.float32), feature_cols
+app = FastAPI(title="Intraday Selective Signal API (v3)", version="3.0.0", lifespan=lifespan)
 
 
-# ── Pydantic v2 Models ────────────────────────────────────────────────
-
-class PredictRequest(BaseModel):
-    symbol: str = Field(..., description="NSE/BSE symbol, e.g. RELIANCE.NS")
-
-    @field_validator("symbol")
-    @classmethod
-    def validate_symbol(cls, v: str) -> str:
-        v = v.upper().strip()
-        if not (v.endswith(".NS") or v.endswith(".BO")):
-            v = v + ".NS"  # auto-append NSE suffix when omitted
-        return v
+async def require_key(x_api_key: str = Header(default="")) -> None:
+    if x_api_key != _state.get("api_key"):
+        raise HTTPException(401, detail="invalid or missing X-API-Key")
 
 
-class BatchPredictRequest(BaseModel):
-    symbols: List[str] = Field(..., min_length=1, max_length=20)
-
-    @field_validator("symbols")
-    @classmethod
-    def validate_symbols(cls, v: List[str]) -> List[str]:
-        return [s.upper().strip() for s in v]
+def _halt_guard() -> None:
+    from src.intraday.risk import halt_reason, is_halted
+    if is_halted():
+        raise HTTPException(503, detail={"halted": True, "reasons": halt_reason()})
 
 
-class AskRequest(BaseModel):
-    query: str = Field(..., min_length=5, max_length=500)
+# ── models ────────────────────────────────────────────────────────────
 
-
-class SentimentResponse(BaseModel):
-    symbol: str
-    score: float
-    label: str
-    confidence: float
-    news_count: int
-    timestamp: str
-
-
-class PredictionResponse(BaseModel):
-    symbol: str
-    signal: str
-    signal_class: int
-    confidence: float
-    probabilities: Dict[str, float]
-    model_used: str
-    sentiment: Optional[SentimentResponse] = None
-    top_features: Dict[str, float] = {}
-    explanation: str = ""
-    timestamp: str
-    data_as_of: str
-
-
-class HealthResponse(BaseModel):
+class Health(BaseModel):
     status: str
-    loaded_models: List[str]
+    model_source: str
+    model_age_min: float
+    gate_tau: float
+    gate_days_updated: int
+    halted: bool
+    journal_chain_ok: bool
     uptime_seconds: float
-    timestamp: str
 
 
-_start_time = datetime.now()
+# ── endpoints ─────────────────────────────────────────────────────────
 
-# ── Endpoints ─────────────────────────────────────────────────────────
-
-@app.get("/health", response_model=HealthResponse, tags=["System"])
+@app.get("/health", response_model=Health, dependencies=[Depends(require_key)])
 async def health():
-    return HealthResponse(
-        status="ok",
-        loaded_models=list(_model_cache.keys()),
-        uptime_seconds=(datetime.now() - _start_time).total_seconds(),
-        timestamp=datetime.now().isoformat(),
+    from src.intraday.risk import is_halted
+    sd = ROOT / CFG["paths"]["state"]
+    mp = sd / "price_model.joblib"
+    age_min = ((now_ist().timestamp() - mp.stat().st_mtime) / 60) if mp.exists() else -1.0
+    today = today_ist()
+    chain_ok = journal_verify(today) if today in journal_days() else True
+    g = _state["gate"].state
+    return Health(
+        status="ok", model_source=_state["model_source"], model_age_min=age_min,
+        gate_tau=g.tau, gate_days_updated=g.days_updated, halted=is_halted(),
+        journal_chain_ok=chain_ok,
+        uptime_seconds=(now_ist() - _state["started"]).total_seconds(),
     )
 
 
-@app.get("/models", tags=["System"])
-async def list_models():
-    """List all trained model artifacts for all configured symbols."""
-    model_dir = Path(CFG["paths"]["manual_models"])
-    models = []
-    for symbol in CFG["stocks"]["symbols"]:
-        for kind in ["lgbm", "xgb", "lstm", "autogluon", "ensemble"]:
-            path = model_dir / f"{symbol}_{kind}.pkl"
-            pt_path = model_dir / f"{symbol}_{kind}.pt"
-            p = path if path.exists() else (pt_path if pt_path.exists() else None)
-            if p:
-                models.append({"symbol": symbol, "model": kind, "path": str(p),
-                                "size_mb": round(p.stat().st_size / 1e6, 2)})
-    return {"models": models, "total": len(models)}
+@app.get("/signals/today", dependencies=[Depends(require_key)])
+async def signals_today():
+    day = today_ist()
+    fills = read_journal(day, "fill")
+    exits = read_journal(day, "exit")
+    explains = {e["payload"].get("symbol"): e["payload"] for e in read_journal(day, "explain")}
+    return {"date": str(day), "fills": [f["payload"] for f in fills],
+            "exits": [e["payload"] for e in exits], "explanations": explains}
 
 
-@app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-async def predict(request: PredictRequest):
-    symbol = request.symbol
-    model = _load_ensemble(symbol)
-
-    X, _ = _get_latest_features(symbol)
-    latest_X = X[-1:].reshape(1, -1)
-
-    proba = model.predict_proba(latest_X)[0]
-    signal_class = int(np.argmax(proba))
-    confidence = float(proba[signal_class])
-
-    # Top features
-    try:
-        top_feat = model.top_features(X[-50:], n=5)
-    except Exception:
-        top_feat = {}
-
-    # Sentiment
-    from src.slm.sentiment import get_live_sentiment
-    sent = get_live_sentiment(symbol)
-
-    # Explanation
-    from src.slm.explainer import explain_prediction
-    explanation = explain_prediction(
-        symbol=symbol,
-        signal_class=signal_class,
-        confidence=confidence,
-        top_features=top_feat,
-        sentiment_score=sent.get("sentiment_score", 0.0),
-        sentiment_label="positive" if sent.get("sentiment_score", 0) > 0.1 else
-                         "negative" if sent.get("sentiment_score", 0) < -0.1 else "neutral",
-    )
-
-    from src.data.features import load_processed
-    df = load_processed(symbol)
-
-    return PredictionResponse(
-        symbol=symbol,
-        signal=SIGNAL_MAP[signal_class],
-        signal_class=signal_class,
-        confidence=round(confidence, 4),
-        probabilities={
-            "strong_sell": round(float(proba[0]), 4),
-            "sell":        round(float(proba[1]), 4),
-            "hold":        round(float(proba[2]), 4),
-            "buy":         round(float(proba[3]), 4),
-            "strong_buy":  round(float(proba[4]), 4),
-        },
-        model_used="stacking_ensemble_manual",
-        sentiment=SentimentResponse(
-            symbol=symbol,
-            score=round(sent.get("sentiment_score", 0.0), 4),
-            label="positive" if sent.get("sentiment_score", 0) > 0.1 else
-                  "negative" if sent.get("sentiment_score", 0) < -0.1 else "neutral",
-            confidence=round(sent.get("sentiment_confidence", 0.5), 4),
-            news_count=int(sent.get("news_count_7d", 0)),
-            timestamp=datetime.now().isoformat(),
-        ),
-        top_features=top_feat,
-        explanation=explanation,
-        timestamp=datetime.now().isoformat(),
-        data_as_of=str(df.index[-1].date()),
-    )
-
-
-@app.post("/predict/batch", tags=["Prediction"])
-async def predict_batch(request: BatchPredictRequest):
-    results = []
-    errors = []
-    for symbol in request.symbols:
+@app.get("/signals/history", dependencies=[Depends(require_key)])
+async def signals_history(days: int = 30):
+    sig_dir = Path(CFG["paths"]["signals_log"])
+    sig_dir = sig_dir if sig_dir.is_absolute() else ROOT / sig_dir
+    cutoff = today_ist() - timedelta(days=days)
+    rows = []
+    import json as _json
+    for f in sorted(sig_dir.glob("paper_*.json")):
         try:
-            resp = await predict(PredictRequest(symbol=symbol))
-            results.append(resp)
-        except Exception as e:
-            errors.append({"symbol": symbol, "error": str(e)})
-    return {"predictions": results, "errors": errors, "total": len(results)}
+            d = date.fromisoformat(f.stem.replace("paper_", ""))
+        except ValueError:
+            continue
+        if d < cutoff:
+            continue
+        for rec in _json.loads(f.read_text()):
+            rows.append({"date": str(d), "symbol": rec["symbol"], "barrier": rec["barrier"],
+                         "label": rec["label"], "pnl_pct_net": rec["pnl_pct_net"]})
+    if not rows:
+        return {"days": days, "n": 0, "win_rate": None, "expectancy": None, "signals": []}
+    tdf = pd.DataFrame(rows)
+    daily = tdf.groupby("date")["pnl_pct_net"].sum()
+    equity = (1 + daily).cumprod()
+    dd = float((equity / equity.cummax() - 1).min())
+    return {"days": days, "n": len(tdf), "win_rate": float(tdf["label"].mean()),
+            "expectancy": float(tdf["pnl_pct_net"].mean()), "max_drawdown": dd,
+            "signals": rows}
 
 
-@app.get("/recommendation/{symbol}", response_model=PredictionResponse, tags=["Prediction"])
-async def recommendation(symbol: str):
-    """Full recommendation with explanation — main endpoint for users."""
-    return await predict(PredictRequest(symbol=symbol))
+@app.get("/screen/today", dependencies=[Depends(require_key)])
+async def screen_today():
+    day = today_ist()
+    screens = read_journal(day, "screen")
+    excl_path = ROOT / CFG["paths"]["state"] / "excluded_symbols.json"
+    import json as _json
+    excluded = _json.loads(excl_path.read_text()) if excl_path.exists() else []
+    return {"date": str(day), "screen": screens[-1]["payload"] if screens else None,
+            "excluded_symbols": excluded}
 
 
-@app.get("/sentiment/{symbol}", response_model=SentimentResponse, tags=["SLM"])
-async def sentiment(symbol: str):
-    symbol = symbol.upper().strip()
-    if not (symbol.endswith(".NS") or symbol.endswith(".BO")):
-        symbol = symbol + ".NS"
-    from src.slm.sentiment import get_live_sentiment
-    sent = get_live_sentiment(symbol)
-    return SentimentResponse(
-        symbol=symbol,
-        score=round(sent.get("sentiment_score", 0.0), 4),
-        label="positive" if sent.get("sentiment_score", 0) > 0.1 else
-              "negative" if sent.get("sentiment_score", 0) < -0.1 else "neutral",
-        confidence=round(sent.get("sentiment_confidence", 0.5), 4),
-        news_count=int(sent.get("news_count_7d", 0)),
-        timestamp=datetime.now().isoformat(),
-    )
-
-
-@app.post("/ask", tags=["SLM"])
-async def ask(request: AskRequest):
-    """Natural language query about stocks."""
-    from src.slm.explainer import _call_ollama
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-
-    # Get current predictions for all configured stocks
-    predictions_summary = []
-    for symbol in CFG["stocks"]["symbols"]:
-        try:
-            pred = await predict(PredictRequest(symbol=symbol))
-            predictions_summary.append(
-                f"{symbol}: {pred.signal} (conf={pred.confidence:.0%})"
-            )
-        except Exception:
-            pass
-
-    context = "\n".join(predictions_summary) if predictions_summary else "No predictions available."
-    prompt = (
-        f"Current stock predictions:\n{context}\n\n"
-        f"User question: {request.query}\n\n"
-        f"Answer concisely based on the data above:"
-    )
-
-    answer = _call_ollama(prompt, "granite4.1:3b", base_url)
-    if not answer:
-        answer = f"Based on current signals: {context}"
-
-    return {"query": request.query, "answer": answer, "timestamp": datetime.now().isoformat()}
-
-
-@app.get("/comparison", tags=["Evaluation"])
-async def comparison():
-    """Side-by-side comparison table of all trained models."""
-    from src.evaluation.evaluator import compare_all
-    try:
-        df = compare_all(include_mlflow=False)
-        return {"comparison": df.to_dict(orient="records"), "generated_at": datetime.now().isoformat()}
-    except Exception as e:
-        raise HTTPException(500, detail=f"Comparison failed: {e}")
-
-
-@app.get("/drift", tags=["Monitoring"])
-async def drift():
-    """Latest drift report status for all configured symbols."""
-    from src.evaluation.monitoring import get_latest_drift_status
+@app.get("/performance", dependencies=[Depends(require_key)])
+async def performance():
+    from src.intraday.conformal_gate import coverage_report
+    hist = await signals_history(days=90)
+    g = CFG["gates"]
+    sig_dir = Path(CFG["paths"]["signals_log"])
+    sig_dir = sig_dir if sig_dir.is_absolute() else ROOT / sig_dir
+    import json as _json
+    rows = []
+    for f in sorted(sig_dir.glob("paper_*.json")):
+        for rec in _json.loads(f.read_text()):
+            rows.append({"symbol": rec["symbol"], "label": int(rec["label"])})
+    cov = coverage_report(pd.DataFrame(rows)) if rows else {}
     return {
-        "symbols": {s: get_latest_drift_status(s) for s in CFG["stocks"]["symbols"]},
-        "timestamp": datetime.now().isoformat(),
+        "rolling": {k: hist.get(k) for k in ("win_rate", "expectancy", "max_drawdown", "n")},
+        "thresholds": {"min_win_rate": g["min_win_rate"], "min_expectancy_pct": g["min_expectancy_pct"]},
+        "per_symbol_coverage": cov,
     }
 
 
-@app.post("/retrain", tags=["Training"])
-async def retrain(background_tasks: BackgroundTasks, trainer: str = "manual"):
-    """Trigger background retraining for all symbols."""
-    if trainer == "mlflow":
-        from src.training.mlflow_trainer import train_all_mlflow
-        background_tasks.add_task(train_all_mlflow)
-    else:
-        from src.training.manual_trainer import train_all
-        background_tasks.add_task(train_all)
+@app.get("/drift", dependencies=[Depends(require_key)])
+async def drift_status():
+    p = Path(CFG["paths"]["drift"])
+    p = p if p.is_absolute() else ROOT / p
+    import json as _json
+    files = sorted(p.glob("*.json")) if p.exists() else []
+    latest = _json.loads(files[-1].read_text()) if files else None
+    aci = read_journal(today_ist(), "aci_update")
+    return {"latest_drift": latest, "last_aci_update": aci[-1]["payload"] if aci else None}
 
-    return {
-        "status": "retraining_started",
-        "trainer": trainer,
-        "message": "Retraining running in background. Check /models when complete.",
-        "timestamp": datetime.now().isoformat(),
-    }
+
+@app.post("/backtest", dependencies=[Depends(require_key)])
+async def trigger_backtest(start: str, end: str):
+    """Start a background backtest job; returns a job id. (Read-only on models —
+    no training/promotion via the API.)"""
+    _halt_guard()
+    job_id = now_ist().strftime("%Y%m%d%H%M%S")
+    _state.setdefault("jobs", {})[job_id] = {"status": "running"}
+
+    async def _run():
+        from src.intraday.backtester import run_backtest
+        try:
+            rep = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: run_backtest(date.fromisoformat(start), date.fromisoformat(end),
+                                           args_note=f"api-job-{job_id}"))
+            _state["jobs"][job_id] = {"status": "done", "report": rep["gates"]}
+        except Exception as e:  # noqa: BLE001 — surfaced via job status
+            _state["jobs"][job_id] = {"status": "failed", "error": str(e)}
+
+    asyncio.create_task(_run())
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.get("/backtest/{job_id}", dependencies=[Depends(require_key)])
+async def backtest_status(job_id: str):
+    job = _state.get("jobs", {}).get(job_id)
+    if not job:
+        raise HTTPException(404, detail="unknown job id")
+    return {"job_id": job_id, **job}

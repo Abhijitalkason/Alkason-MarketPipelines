@@ -1,9 +1,13 @@
 """Official NSE EOD files — equity bhavcopy (delivery %), F&O bhavcopy (OI, basis),
-FII/DII flows, pre-open snapshot (PLAN_v3 Section 6, Tier 1).
+FII/DII flows, pre-open snapshot (PLAN_v3 §6 Tier 1; v3_supplementry §3.3).
 
 NSE serves archives only to browser-like sessions: we warm up a session against
 nseindia.com and send a real User-Agent. All outputs land in data/bhavcopy/ as
 parquet, stamped with capture_ts. Parse failures raise (v1 post-mortem #7).
+
+backfill_bhavcopies RAISES at the end if any business day that is not in
+data/reference/nse_holidays.csv is missing BOTH eq and fo files (M-1) — silent
+holes in the EOD archive poison every downstream flow feature.
 """
 
 from __future__ import annotations
@@ -11,12 +15,13 @@ from __future__ import annotations
 import io
 import logging
 import zipfile
-from datetime import date, datetime
+from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import requests
 
-from src.intraday import ROOT, load_config
+from src.intraday import ROOT, load_config, now_ist
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +47,9 @@ def _session() -> requests.Session:
     return s
 
 
-def _out_dir():
-    d = ROOT / load_config()["data"]["bhavcopy_path"]
+def _out_dir() -> Path:
+    d = Path(load_config()["data"]["bhavcopy_path"])
+    d = d if d.is_absolute() else ROOT / d
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -55,6 +61,20 @@ def _fetch(s: requests.Session, url: str) -> bytes:
     return resp.content
 
 
+def load_holidays() -> set[date]:
+    """NSE trading holidays from data/reference/nse_holidays.csv (date,description).
+    Maintained yearly from the NSE trading-holiday list; missing file raises —
+    without it, raise-on-miss cannot distinguish a holiday from a data hole."""
+    p = ROOT / load_config()["data"]["reference_path"] / "nse_holidays.csv"
+    if not p.exists():
+        raise BhavcopyError(
+            "data/reference/nse_holidays.csv missing — populate from the NSE "
+            "trading-holiday list before running the bhavcopy backfill"
+        )
+    df = pd.read_csv(p, comment="#")
+    return set(pd.to_datetime(df["date"]).dt.date)
+
+
 # ── Equity bhavcopy + delivery % ──────────────────────────────────────
 
 def fetch_equity_bhavcopy(d: date, s: requests.Session | None = None) -> pd.DataFrame:
@@ -64,7 +84,8 @@ def fetch_equity_bhavcopy(d: date, s: requests.Session | None = None) -> pd.Data
     raw = _fetch(s, url)
     df = pd.read_csv(io.BytesIO(raw))
     df.columns = [c.strip() for c in df.columns]
-    df = df[df[" SERIES"].str.strip() == "EQ"] if " SERIES" in df.columns else df[df["SERIES"].str.strip() == "EQ"]
+    series_col = "SERIES" if "SERIES" in df.columns else " SERIES"
+    df = df[df[series_col].str.strip() == "EQ"]
     df = df.rename(columns=lambda c: c.strip().lower())
     keep = ["symbol", "date1", "prev_close", "open_price", "high_price", "low_price",
             "close_price", "ttl_trd_qnty", "turnover_lacs", "deliv_qty", "deliv_per"]
@@ -75,7 +96,7 @@ def fetch_equity_bhavcopy(d: date, s: requests.Session | None = None) -> pd.Data
     out["symbol"] = out["symbol"].str.strip()
     out["deliv_per"] = pd.to_numeric(out["deliv_per"], errors="coerce")
     out["date"] = pd.to_datetime(d)
-    out["capture_ts"] = datetime.now()
+    out["capture_ts"] = now_ist()
     path = _out_dir() / f"eq_{d.isoformat()}.parquet"
     out.to_parquet(path, index=False)
     logger.info("equity bhavcopy %s: %d rows → %s", d, len(out), path.name)
@@ -85,7 +106,7 @@ def fetch_equity_bhavcopy(d: date, s: requests.Session | None = None) -> pd.Data
 # ── F&O bhavcopy: stock futures OI + basis ────────────────────────────
 
 def fetch_fo_bhavcopy(d: date, s: requests.Session | None = None) -> pd.DataFrame:
-    """F&O bhavcopy (UDiFF format) → near-month stock futures: OI, OI change, close."""
+    """F&O bhavcopy (UDiFF format) → near-month stock futures: OI, OI change, basis."""
     s = s or _session()
     url = f"{ARCHIVES}/content/fo/BhavCopy_NSE_FO_0_0_0_{d.strftime('%Y%m%d')}_F_0000.csv.zip"
     raw = _fetch(s, url)
@@ -102,7 +123,7 @@ def fetch_fo_bhavcopy(d: date, s: requests.Session | None = None) -> pd.DataFram
     })[["symbol", "fut_close", "spot_close", "oi", "oi_change"]]
     out["basis_pct"] = (out["fut_close"] - out["spot_close"]) / out["spot_close"]
     out["date"] = pd.to_datetime(d)
-    out["capture_ts"] = datetime.now()
+    out["capture_ts"] = now_ist()
     path = _out_dir() / f"fo_{d.isoformat()}.parquet"
     out.to_parquet(path, index=False)
     logger.info("F&O bhavcopy %s: %d stock futures → %s", d, len(out), path.name)
@@ -112,19 +133,34 @@ def fetch_fo_bhavcopy(d: date, s: requests.Session | None = None) -> pd.DataFram
 # ── FII / DII flows ───────────────────────────────────────────────────
 
 def fetch_fii_dii(s: requests.Session | None = None) -> pd.DataFrame:
-    """Latest FII/DII cash-market net flows (NSE publishes T-day after close)."""
+    """FII/DII cash-market net flows. Output schema (B-4 prerequisite):
+    [date, fii_net_cr, dii_net_cr, capture_ts] — the parsed `date` column is
+    what makes the strictly-before-day filter in features possible."""
     s = s or _session()
     raw = _fetch(s, f"{NSE_API}/fiidiiTradeReact")
-    df = pd.DataFrame(pd.read_json(io.BytesIO(raw)))
-    if df.empty:
+    payload = pd.read_json(io.BytesIO(raw))
+    if payload.empty:
         raise BhavcopyError("FII/DII endpoint returned empty payload")
-    df["capture_ts"] = datetime.now()
+    if not {"category", "date", "netValue"}.issubset(payload.columns):
+        raise BhavcopyError(f"FII/DII payload schema changed: {list(payload.columns)}")
+    payload["date"] = pd.to_datetime(payload["date"], format="%d-%b-%Y")
+    payload["netValue"] = pd.to_numeric(payload["netValue"])
+    wide = payload.pivot_table(index="date", columns="category", values="netValue", aggfunc="first")
+    fii_col = next((c for c in wide.columns if "FII" in str(c).upper() or "FPI" in str(c).upper()), None)
+    dii_col = next((c for c in wide.columns if "DII" in str(c).upper()), None)
+    if fii_col is None or dii_col is None:
+        raise BhavcopyError(f"FII/DII categories not found in {list(wide.columns)}")
+    df = pd.DataFrame({
+        "date": wide.index,
+        "fii_net_cr": wide[fii_col].values,
+        "dii_net_cr": wide[dii_col].values,
+    })
+    df["capture_ts"] = now_ist()
     path = _out_dir() / "fii_dii.parquet"
-    if path.exists():  # append-only history
+    if path.exists():  # append-only history, keyed by flow date
         old = pd.read_parquet(path)
-        df = pd.concat([old, df], ignore_index=True).drop_duplicates(
-            subset=[c for c in df.columns if c != "capture_ts"]
-        )
+        df = pd.concat([old, df], ignore_index=True).drop_duplicates(subset="date", keep="first")
+    df = df.sort_values("date").reset_index(drop=True)
     df.to_parquet(path, index=False)
     return df
 
@@ -137,7 +173,7 @@ def fetch_preopen(s: requests.Session | None = None) -> pd.DataFrame:
     raw = _fetch(s, f"{NSE_API}/market-data-pre-open?key=FO")  # FO = all F&O-listed stocks
     payload = pd.read_json(io.BytesIO(raw))
     rows = []
-    now = datetime.now()
+    now = now_ist()
     for rec in payload.get("data", []):
         meta = rec.get("metadata", {})
         detail = rec.get("detail", {}).get("preOpenMarket", {})
@@ -155,26 +191,43 @@ def fetch_preopen(s: requests.Session | None = None) -> pd.DataFrame:
     buy = df["total_buy_qty"].astype(float)
     sell = df["total_sell_qty"].astype(float)
     df["imbalance"] = (buy - sell) / (buy + sell).replace(0, pd.NA)
-    out_dir = ROOT / load_config()["data"]["preopen_path"]
+    out_dir = Path(load_config()["data"]["preopen_path"])
+    out_dir = out_dir if out_dir.is_absolute() else ROOT / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(out_dir / f"{date.today().isoformat()}.parquet", index=False)
+    df.to_parquet(out_dir / f"{now.date().isoformat()}.parquet", index=False)
     return df
 
 
 # ── range download ────────────────────────────────────────────────────
 
 def backfill_bhavcopies(start: date, end: date) -> None:
-    """Download equity + F&O bhavcopies for a date range (skips weekends/holidays)."""
+    """Download equity + F&O bhavcopies for a date range.
+
+    Raise-on-miss (M-1): after the sweep, any business day that is not an NSE
+    holiday and is missing BOTH files raises BhavcopyError with the full list.
+    """
     s = _session()
-    failures = []
+    holidays = load_holidays()
+    failures: dict[date, list[str]] = {}
     for d in pd.bdate_range(start, end).date:
-        for fn in (fetch_equity_bhavcopy, fetch_fo_bhavcopy):
-            out = _out_dir() / f"{'eq' if fn is fetch_equity_bhavcopy else 'fo'}_{d.isoformat()}.parquet"
+        if d in holidays:
+            continue
+        for prefix, fn in (("eq", fetch_equity_bhavcopy), ("fo", fetch_fo_bhavcopy)):
+            out = _out_dir() / f"{prefix}_{d.isoformat()}.parquet"
             if out.exists():
                 continue
             try:
                 fn(d, s)
             except BhavcopyError as e:
-                # Holidays return 404 — only a failure if equity AND fo both missing on a weekday
-                failures.append((d, fn.__name__, str(e)))
-    logger.info("bhavcopy backfill done; %d misses (incl. holidays)", len(failures))
+                failures.setdefault(d, []).append(f"{prefix}: {e}")
+    hard = {d: msgs for d, msgs in failures.items()
+            if not (_out_dir() / f"eq_{d.isoformat()}.parquet").exists()
+            and not (_out_dir() / f"fo_{d.isoformat()}.parquet").exists()}
+    if hard:
+        sample = list(hard.items())[:10]
+        raise BhavcopyError(
+            f"bhavcopy backfill: {len(hard)} non-holiday business days have NO files "
+            f"(first 10: {sample}) — update nse_holidays.csv if these are holidays, "
+            f"otherwise investigate before any dataset build"
+        )
+    logger.info("bhavcopy backfill complete; %d partial-day misses tolerated", len(failures))

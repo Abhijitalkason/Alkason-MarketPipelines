@@ -1,19 +1,22 @@
-"""Risk layer (PLAN_v3 Section 13) — sizing, limits, blackout calendar, kill switches.
+"""Risk layer (PLAN_v3 §13; v3_supplementry §11) — sizing, limits, blackout
+calendar, kill switches.
 
-Exists because at 0.4/3.2 geometry one full stop erases ~8 winners. High-win-rate
-systems die by tails; every control here is load-bearing.
+Exists because at 0.4/3.2 geometry one full stop erases ~8 winners. High-win-
+rate systems die by tails; every control here is load-bearing AND has a live
+call site (the paper runner) plus a test that fails if the call site is removed
+— no dead controls (v3_supplementry §0 non-negotiable #2).
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
-from datetime import date, datetime
+from dataclasses import asdict, dataclass, field
+from datetime import date
 
 import pandas as pd
 
-from src.intraday import ROOT, load_config, load_universe
+from src.intraday import ROOT, load_config, load_universe, now_ist, today_ist
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,8 @@ def _events() -> pd.DataFrame:
 
 
 def is_blackout(day: date, symbol: str | None = None) -> bool:
-    """True if no signals may be emitted for `day` (market-wide or symbol results day ±1)."""
+    """True if no signals may be emitted for `day` (market-wide or symbol
+    results day ±1). Weekly index expiry auto-flagged from config weekday."""
     cfg = load_config()["risk"]
     if day.weekday() == cfg["expiry_weekday"]:        # weekly index expiry
         return True
@@ -61,7 +65,7 @@ def position_size(capital_inr: float, entry: float, stop: float) -> int:
     return max(0, min(qty, max_qty))
 
 
-# ── intra-day limits ──────────────────────────────────────────────────
+# ── intra-day limits (persisted in the session state file) ────────────
 
 @dataclass
 class DayState:
@@ -71,12 +75,21 @@ class DayState:
     halted: bool = False
     halt_reason: str = ""
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "DayState":
+        return cls(**d)
+
 
 class RiskManager:
-    def __init__(self, capital_inr: float):
+    def __init__(self, capital_inr: float, state: DayState | None = None,
+                 as_of: date | None = None):
         self.cfg = load_config()["risk"]
-        self.state = DayState(capital_inr=capital_inr)
-        self._sectors = dict(zip(load_universe()["symbol"], load_universe()["sector"]))
+        self.state = state or DayState(capital_inr=capital_inr)
+        uni = load_universe(as_of=as_of or today_ist())
+        self._sectors = dict(zip(uni["symbol"], uni["sector"]))
 
     def can_open(self, symbol: str, day: date) -> tuple[bool, str]:
         s = self.state
@@ -106,18 +119,23 @@ class RiskManager:
 # ── kill switches (Section 13) — evaluated post-market ────────────────
 
 def check_kill_switches(trades: pd.DataFrame, backtest_win_rate: float) -> list[str]:
-    """trades: trade log with [date, label, pnl_pct_net]. Returns breached switches."""
+    """Two switches over the live/paper trade log [date, label, pnl_pct_net]:
+      (a) mean net expectancy over the last 20 sessions' trades < 0
+      (b) last 30 trades' win rate < backtest win rate − 0.10
+    Breach → _persist_halt → next session refuses to start. Callers: paper
+    runner post-market and gates.py (no dead control)."""
     breaches = []
     if trades.empty:
         return breaches
     trades = trades.sort_values("date")
-    daily = trades.groupby("date")["pnl_pct_net"].sum()
-    if len(daily) >= 20 and trades.tail(200).pnl_pct_net.rolling(1).mean().tail(20).mean() < 0:
-        recent = trades[trades.date.isin(daily.tail(20).index)]
-        if recent.pnl_pct_net.mean() < 0:
+    daily = trades.groupby("date")["pnl_pct_net"].mean()
+    if len(daily) >= 20:
+        recent_days = set(daily.tail(20).index)
+        recent = trades[trades.date.isin(recent_days)]
+        if recent["pnl_pct_net"].mean() < 0:
             breaches.append("rolling_20d_expectancy_negative")
     last30 = trades.tail(30)
-    if len(last30) == 30 and last30.label.mean() < backtest_win_rate - 0.10:
+    if len(last30) == 30 and last30["label"].mean() < backtest_win_rate - 0.10:
         breaches.append("live_win_rate_10pts_below_backtest")
     if breaches:
         _persist_halt(breaches)
@@ -127,9 +145,25 @@ def check_kill_switches(trades: pd.DataFrame, backtest_win_rate: float) -> list[
 def _persist_halt(breaches: list[str]) -> None:
     p = ROOT / load_config()["paths"]["state"] / "halt.json"
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"halted_at": datetime.now().isoformat(), "breaches": breaches}, indent=2))
+    p.write_text(json.dumps({"halted_at": now_ist().isoformat(), "breaches": breaches}, indent=2))
     logger.error("KILL SWITCH: %s — system halted (delete models/v3/halt.json after review)", breaches)
+    try:
+        from src.intraday.journal import journal_write
+        journal_write("halt", {"breaches": breaches})
+    except Exception:  # noqa: BLE001 — never let journaling failure mask the halt
+        pass
 
 
 def is_halted() -> bool:
     return (ROOT / load_config()["paths"]["state"] / "halt.json").exists()
+
+
+def halt_reason() -> list[str]:
+    p = ROOT / load_config()["paths"]["state"] / "halt.json"
+    return json.loads(p.read_text())["breaches"] if p.exists() else []
+
+
+def clear_halt() -> None:
+    p = ROOT / load_config()["paths"]["state"] / "halt.json"
+    if p.exists():
+        p.unlink()

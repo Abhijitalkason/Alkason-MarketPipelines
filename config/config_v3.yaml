@@ -1,15 +1,15 @@
 # PLAN v3 — Intraday Selective Signal System configuration
-# Section references → PLAN_v3.md
+# Section references → PLAN_v3.md + v3_supplementry.md §2.
+# Every key here is consumed by code; tests/test_config.py fails on dead keys.
 
 universe:
-  source: nse200                      # data/reference/universe.csv
-  file: data/reference/universe.csv
+  membership_file: data/reference/universe_membership.csv   # point-in-time membership
   index_symbol: "NIFTY 50"            # index for alignment features
-  min_median_1min_volume: 5000
-  max_median_spread_bps: 5
+  min_median_1min_volume: 5000        # liquidity floor — enforced in screener (H-1)
+  max_median_spread_bps: 5            # spread floor — enforced when depth exists (H-1)
 
 data:
-  provider: upstox                    # upstox | kite
+  provider: upstox                    # upstox (kite: not implemented — fail loudly)
   bars_path: data/bars
   bhavcopy_path: data/bhavcopy
   preopen_path: data/preopen
@@ -21,13 +21,17 @@ data:
   bar_freq_feature: 5min              # feature computation bars
   session_open: "09:15"
   session_close: "15:30"
+  timezone: Asia/Kolkata              # all session logic pinned to IST (M-7)
+  live_poll_seconds: 10               # screened-name poll cadence after 09:30 (H-3)
+  max_flow_missing_share: 0.40        # flow real-data floor — raises FlowDataError (B-5)
+  max_skip_share: 0.05                # dataset-thinning tolerance — raises (M-1)
 
 screen:
   time: "09:30:05"
   top_n: 12
   gap_band: [0.003, 0.025]            # |gap| must be inside this band for gap_quality
   lookback_days: 20
-  weights:                            # initial weights; re-fit per fold and frozen (Section 7)
+  weights:                            # live DEFAULTS; per-fold fitted weights override (§5.3)
     volume_surge: 0.30
     range_expansion: 0.20
     gap_quality: 0.15
@@ -35,7 +39,7 @@ screen:
     delivery_z: 0.10
     index_alignment: 0.10
 
-geometry:                             # Section 8 — tuned on train folds, then FROZEN
+geometry:                             # Section 8 — tuned by geometry_study, then FROZEN
   target_atr: 0.40
   stop_atr: 3.20
   time_barrier_hours: 3
@@ -48,15 +52,22 @@ gate:                                 # Section 11
   aci_gamma: 0.01
   target_win_rate: 0.89               # alpha = 1 - target_win_rate
   model_agreement_floor: 0.75
-  calibration_window_days: 60
+  calibration_window_days: 60         # rolling recalibration window (trainer --mode recalibrate)
+  flow_model_active: false            # staged activation (B-5); trainer flips when
+                                      # flow_real_share >= flow_activation_share
+  flow_activation_share: 0.60
 
 training:                             # Section 12
   train_min_months: 18
   test_fold_months: 3
+  min_folds: 6                        # walk-forward must produce at least this many OOS folds
   embargo_days: 1
+  tune: true                          # Optuna tuning on the inner train split (CI sets false)
   optuna_trials: 30
   blend_weight_init: 0.6
   random_state: 42
+  inner_calib_days: 60                # day-boundary inner calibration tail (M-3)
+  recalib_min_signals: 200            # rolling recalibration aborts below this
 
 costs:                                # Section 12.1 — single source of truth = src/intraday/costs.py
   brokerage_per_order_inr: 20
@@ -65,7 +76,8 @@ costs:                                # Section 12.1 — single source of truth 
   sebi_fee_pct: 0.000001
   stamp_buy_pct: 0.00003
   gst_pct: 0.18
-  slippage_pct: 0.0003
+  slippage_half_spread_pct: 0.0002    # per-side half-spread component (H-7)
+  impact_coeff: 0.10                  # impact = coeff * (qty / median_1min_volume), per side
   slippage_stress_multiplier: 2.0
 
 risk:                                 # Section 13
@@ -77,20 +89,38 @@ risk:                                 # Section 13
   blackout: [expiry, results, rbi, fed, budget]
   expiry_weekday: 3                   # Thursday (0=Mon) — weekly index expiry blackout
 
+drift:                                # B-7 — Evidently drift → ACI recalib → halt
+  reference_artifact: feature_matrix  # production model's training matrix (drift reference)
+  current_window_sessions: 10
+  share_drifted_columns_alert: 0.30
+  consecutive_breaches_to_halt: 2
+
 gates:                                # Section 19 — machine-checkable acceptance gates
   min_win_rate: 0.89
   min_expectancy_pct: 0.0005
   min_signals_per_day: 1.0
   leakage_alarm_win_rate: 0.92
   leakage_alarm_coverage: 0.10
+  calibration_max_gap: 0.02           # |expected − realized| win rate in fired region
   paper_days: 22
   paper_max_winrate_gap: 0.03
 
 mlflow:
   tracking_uri: http://localhost:5000
   experiment_name: intraday-selective-v3
+  registry_model_name: intraday-v3-signal
+
+api:                                  # Section 13 (supplementary)
+  host: 0.0.0.0
+  port: 8000
+  api_key_env: V3_API_KEY             # name of env var holding the API key
 
 paths:
   reports: reports/v3
   signals_log: reports/v3/signals
+  journal: reports/v3/journal
+  alerts: reports/v3/alerts
+  gates: reports/v3/gates
+  drift: reports/v3/drift
+  run_registry: reports/v3/run_registry.csv
   state: models/v3                    # gate state, blend, models

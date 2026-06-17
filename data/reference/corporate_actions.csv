@@ -1,0 +1,6 @@
+# Corporate-action price factors — consumed by corporate_actions.apply on read
+# (v3_supplementry 3.5, H-2). Built by `python main.py --mode corp-actions`.
+# factor = post-event price / pre-event price (1:2 split -> 0.5). Prices strictly
+# before ex_date are multiplied by the cumulative product of later factors.
+# Empty (header-only) is valid — it means no actions are recorded yet.
+symbol,ex_date,purpose,factor

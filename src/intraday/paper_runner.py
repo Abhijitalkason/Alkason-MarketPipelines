@@ -1,14 +1,21 @@
-"""Paper-trading runner (PLAN_v3 Section 14 / Gate 4).
+"""Paper-trading runner (PLAN_v3 §14 / Gate 4; v3_supplementry §10.2).
 
-Runs the FULL live loop with simulated orders at real quoted prices:
-recorder → 09:30 screen → features per 15-min close → blend → ACI gate →
-simulated fills → barrier tracking → 14:45 square-off → post-market ACI update.
+Full live loop with simulated orders at real quoted prices:
+recorder (live bars) → 09:30 screen → features per 15-min close → blend → ACI
+gate → simulated fills at bid/ask → barrier tracking → 14:45 square-off →
+post-market label maturation + ACI update + kill-switch + drift checks.
 
-Every signal is logged with its full feature vector and quoted-vs-assumed fill —
-this log is the train/serve-skew detector. Pass criterion: ≥22 sessions, live
-win rate within 3 points of backtest, positive expectancy, slippage in model.
+Critical fixes vs the skeleton:
+  - B-2: the screen and features consume recorder.history_with_today(), so the
+    09:30 screen sees today's first bar and features see intraday bars live;
+  - H-10: check_schema before every serve-time predict;
+  - restart safety (A.3): positions, closed trades, risk DayState, and the tick
+    buffer all rehydrate from session_state_<date>.json + the recorder spill;
+  - B-7: check_kill_switches and drift.run_check have their first/live callers
+    here, post-market;
+  - every screen / gate-eval / fill / exit / aci_update is journaled.
 
-Run: python main.py --mode paper --capital 1000000
+Loads the Staging bundle from the registry (fallback: models/v3 files).
 """
 
 from __future__ import annotations
@@ -16,82 +23,143 @@ from __future__ import annotations
 import json
 import logging
 import time as time_mod
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
+from pathlib import Path
 
 import pandas as pd
 
-from src.intraday import ROOT, load_config
+from src.intraday import ROOT, load_config, now_ist, today_ist
 from src.intraday.blend import Blender
 from src.intraday.conformal_gate import ACIGate
 from src.intraday.costs import round_trip_cost_pct
-from src.intraday.features import features_for_day
+from src.intraday.features import check_schema, features_for_day
 from src.intraday.flow_model import FlowModel
+from src.intraday.journal import journal_write, seal_day
 from src.intraday.price_model import PriceModel
 from src.intraday.recorder import SessionRecorder, _wait_until
-from src.intraday.risk import RiskManager, is_blackout, is_halted, position_size
+from src.intraday.risk import (DayState, RiskManager, check_kill_switches, is_blackout,
+                               is_halted, position_size)
 from src.intraday.screener import screen_day
 
 logger = logging.getLogger(__name__)
 
+LOOKBACK_DAYS = 45
+
 
 class PaperRunner:
-    def __init__(self, capital_inr: float):
+    def __init__(self, capital_inr: float, day: date | None = None):
         self.cfg = load_config()
-        state = ROOT / self.cfg["paths"]["state"]
-        self.price_model = PriceModel.load(state / "price_model.joblib")
-        self.flow_model = FlowModel.load(state / "flow_model.joblib")
-        self.blender = Blender.load(state / "blender.joblib")
-        self.gate = ACIGate.load()
-        self.risk = RiskManager(capital_inr)
+        self.day = day or today_ist()
         self.capital = capital_inr
-        self.recorder = SessionRecorder()
+        self.state_dir = ROOT / self.cfg["paths"]["state"]
+        self._load_bundle()
+        self.recorder = SessionRecorder(day=self.day)
         self.positions: dict[str, dict] = {}
         self.closed: list[dict] = []
-        self.log_dir = ROOT / self.cfg["paths"]["signals_log"]
+        self.screened: pd.DataFrame | None = None
+        self.risk = RiskManager(capital_inr, as_of=self.day)
+        self.log_dir = Path(self.cfg["paths"]["signals_log"])
+        self.log_dir = self.log_dir if self.log_dir.is_absolute() else ROOT / self.log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self._session_state = self.state_dir / f"session_state_{self.day.isoformat()}.json"
+        self._restore_state()
+
+    def _load_bundle(self) -> None:
+        """Staging from the registry; fallback to models/v3 files with a WARN."""
+        try:
+            from src.intraday.tracking import load_stage  # type: ignore[attr-defined]
+            bundle = load_stage("Staging")
+            self.price_model, self.flow_model, self.blender = bundle
+        except Exception as e:  # noqa: BLE001 — registry optional in local paper runs
+            logger.warning("registry Staging load failed (%s) — using models/v3 files", e)
+            self.price_model = PriceModel.load(self.state_dir / "price_model.joblib")
+            self.flow_model = (FlowModel.load(self.state_dir / "flow_model.joblib")
+                               if (self.state_dir / "flow_model.joblib").exists() else None)
+            self.blender = Blender.load(self.state_dir / "blender.joblib")
+        self.gate = ACIGate.load()
+
+    # ── restart safety ────────────────────────────────────────────────
+
+    def _restore_state(self) -> None:
+        if self._session_state.exists():
+            s = json.loads(self._session_state.read_text())
+            self.positions = s.get("positions", {})
+            self.closed = s.get("closed", [])
+            self.risk.state = DayState.from_dict(s["day_state"])
+            logger.info("paper: resumed session %s (%d open, %d closed)",
+                        self.day, len(self.positions), len(self.closed))
+
+    def _persist_state(self) -> None:
+        self._session_state.write_text(json.dumps({
+            "positions": self.positions, "closed": self.closed,
+            "day_state": self.risk.state.to_dict(),
+        }, default=str))
 
     # ── live evaluation at each 15-min close ──────────────────────────
 
-    def evaluate(self, screened: pd.DataFrame, day: date) -> None:
-        geo = self.cfg["geometry"]
-        for _, s in screened.iterrows():
+    def evaluate(self) -> None:
+        for _, s in self.screened.iterrows():
             sym = s["symbol"]
             if sym in self.positions:
                 continue
-            ok, reason = self.risk.can_open(sym, day)
+            ok, reason = self.risk.can_open(sym, self.day)
             if not ok:
                 continue
-            feats = features_for_day(sym, day, int(s["direction"]))
+            df_1min = self.recorder.history_with_today(sym, LOOKBACK_DAYS)
+            if df_1min.empty:
+                continue
+            feats = features_for_day(sym, self.day, int(s["direction"]), df_1min=df_1min)
             if feats.empty:
                 continue
-            row = feats.iloc[[-1]]                                   # latest closed decision bar
+            row = feats.iloc[[-1]]                          # latest closed decision bar
+            check_schema(row)                               # H-10 serve-time guard
             p_p = self.price_model.predict_proba(row)
-            p_f = self.flow_model.predict_proba(row)
+            p_f = self.flow_model.predict_proba(row) if self.flow_model is not None else None
             p_cal = self.blender.calibrated(p_p, p_f)
-            if not bool(self.gate.fire(p_cal, p_p, p_f)[0]):
+            fired = bool(self.gate.fire(p_cal, p_p, p_f)[0])
+            journal_write("gate_eval", {
+                "symbol": sym, "p_price": float(p_p[0]),
+                "p_flow": float(p_f[0]) if p_f is not None else None,
+                "p_cal": float(p_cal[0]), "tau": self.gate.state.tau, "fired": fired,
+            }, day=self.day)
+            if not fired:
                 continue
+            self._open(sym, int(s["direction"]), row, float(p_cal[0]))
 
-            quote = self.recorder.poll_quotes_once()
-            q = quote[quote.symbol == sym]
-            if q.empty or pd.isna(q["ask"].iloc[0]):
-                continue
-            direction = int(s["direction"])
-            entry = float(q["ask"].iloc[0] if direction == 1 else q["bid"].iloc[0])
-            atr = float(row["atr_pct"].iloc[0]) * entry
-            qty = position_size(self.capital, entry, entry - direction * geo["stop_atr"] * atr)
-            if qty == 0:
-                continue
-            self.positions[sym] = {
-                "symbol": sym, "direction": direction, "entry": entry, "qty": qty,
-                "target": entry + direction * geo["target_atr"] * atr,
-                "stop": entry - direction * geo["stop_atr"] * atr,
-                "entry_ts": datetime.now(),
-                "t_bar": datetime.now() + pd.Timedelta(hours=geo["time_barrier_hours"]),
-                "p_cal": float(p_cal[0]),
-                "features": row.drop(columns=["symbol", "ts", "date"]).iloc[0].to_dict(),
-            }
-            self.risk.on_open(sym)
-            logger.info("PAPER OPEN %s dir=%+d entry=%.2f qty=%d p=%.3f", sym, direction, entry, qty, p_cal[0])
+    def _open(self, sym: str, direction: int, row: pd.DataFrame, p_cal: float) -> None:
+        geo = self.cfg["geometry"]
+        quote = self.recorder.poll_quotes_once()
+        q = quote[quote.symbol == sym]
+        if q.empty or pd.isna(q["ask"].iloc[0]) or pd.isna(q["bid"].iloc[0]):
+            journal_write("gate_eval", {"symbol": sym, "fired": True, "skipped": "no_quote"}, day=self.day)
+            return
+        entry = float(q["ask"].iloc[0] if direction == 1 else q["bid"].iloc[0])
+        atr = float(row["atr_pct"].iloc[0]) * entry
+        stop = entry - direction * geo["stop_atr"] * atr
+        qty = position_size(self.capital, entry, stop)
+        if qty == 0:
+            journal_write("gate_eval", {"symbol": sym, "fired": True, "skipped": "zero_qty"}, day=self.day)
+            return
+        try:
+            shap = self.price_model.shap_top(row, n=10)
+        except Exception as e:  # noqa: BLE001 — SHAP is explanatory, not gating
+            shap = {}
+            logger.warning("SHAP failed for %s: %s", sym, e)
+        self.positions[sym] = {
+            "symbol": sym, "direction": direction, "entry": entry, "qty": qty,
+            "target": entry + direction * geo["target_atr"] * atr, "stop": stop,
+            "entry_ts": now_ist().isoformat(),
+            "t_bar": (now_ist() + timedelta(hours=geo["time_barrier_hours"])).isoformat(),
+            "p_cal": p_cal,
+            "features": row.drop(columns=["symbol", "ts", "date"], errors="ignore").iloc[0].to_dict(),
+        }
+        self.risk.on_open(sym)
+        journal_write("fill", {"symbol": sym, "direction": direction, "entry": entry,
+                              "qty": qty, "p_cal": p_cal, "shap_top": shap,
+                              "quoted_bid": float(q["bid"].iloc[0]),
+                              "quoted_ask": float(q["ask"].iloc[0])}, day=self.day)
+        self._persist_state()
+        logger.info("PAPER OPEN %s dir=%+d entry=%.2f qty=%d p=%.3f", sym, direction, entry, qty, p_cal)
 
     def manage_positions(self) -> None:
         if not self.positions:
@@ -101,80 +169,142 @@ class PaperRunner:
         for sym in list(self.positions):
             pos = self.positions[sym]
             q = quotes[quotes.symbol == sym]
-            if q.empty:
+            if q.empty or pd.isna(q["ltp"].iloc[0]):
+                logger.warning("no quote to manage %s this cycle", sym)
                 continue
             ltp = float(q["ltp"].iloc[0])
-            now = datetime.now()
+            now = now_ist()
             d = pos["direction"]
-            exit_reason = None
+            reason = None
             if (d == 1 and ltp >= pos["target"]) or (d == -1 and ltp <= pos["target"]):
-                exit_reason = "target"
+                reason = "target"
             elif (d == 1 and ltp <= pos["stop"]) or (d == -1 and ltp >= pos["stop"]):
-                exit_reason = "stop"
-            elif now >= pos["t_bar"] or now.time() >= squareoff:
-                exit_reason = "time"
-            if exit_reason:
-                self._close(sym, ltp, exit_reason)
+                reason = "stop"
+            elif now >= datetime.fromisoformat(pos["t_bar"]) or now.time() >= squareoff:
+                reason = "time"
+            if reason:
+                self._close(sym, ltp, reason)
 
     def _close(self, sym: str, exit_price: float, reason: str) -> None:
         pos = self.positions.pop(sym)
         gross = pos["direction"] * (exit_price - pos["entry"]) / pos["entry"]
-        cost = round_trip_cost_pct(pos["entry"], pos["qty"])
+        try:
+            mv = self.recorder.history_with_today(sym, LOOKBACK_DAYS)["volume"].tail(20).median()
+            mv = float(mv) if mv and mv > 0 else self.cfg["universe"]["min_median_1min_volume"]
+        except Exception:  # noqa: BLE001
+            mv = self.cfg["universe"]["min_median_1min_volume"]
+        cost = round_trip_cost_pct(pos["entry"], pos["qty"], mv, entry_is_quoted=True)
         net = gross - cost
         pnl_inr = net * pos["entry"] * pos["qty"]
         self.risk.on_close(sym, pnl_inr)
         rec = {**{k: v for k, v in pos.items() if k != "features"},
-               "exit": exit_price, "barrier": reason, "exit_ts": datetime.now(),
+               "exit": exit_price, "barrier": reason, "exit_ts": now_ist().isoformat(),
                "pnl_pct_gross": gross, "cost_pct": cost, "pnl_pct_net": net,
                "label": int(net > 0) if reason == "time" else int(reason == "target"),
                "features": pos["features"]}
         self.closed.append(rec)
+        journal_write("exit", {"symbol": sym, "barrier": reason, "exit": exit_price,
+                              "pnl_pct_net": net, "label": rec["label"]}, day=self.day)
+        self._persist_state()
         logger.info("PAPER CLOSE %s %s net=%.3f%%", sym, reason, net * 100)
 
     # ── session loop ──────────────────────────────────────────────────
 
     def run_session(self) -> None:
-        day = date.today()
         if is_halted():
             raise RuntimeError("kill switch active (models/v3/halt.json) — review before running")
-        if is_blackout(day):
-            logger.info("%s is a blackout day — no signals; recorder still runs", day)
+        self.recorder.auth_ping()
+        if is_blackout(self.day):
+            logger.info("%s is a blackout day — recorder runs, no signals", self.day)
             self.recorder.run_session()
             return
 
         self.recorder.capture_preopen()
-        _wait_until(time(9, 30, 5))
-        screened = screen_day(day)
-        self.recorder.set_screened(screened.symbol.tolist())
+        # poll through the pre-screen window so today's first 15-min bar exists live
+        _wait_until(time.fromisoformat(self.cfg["data"]["session_open"]))
+        screen_t = time.fromisoformat(self.cfg["screen"]["time"])
+        while now_ist().time() < screen_t:
+            self.recorder.poll_quotes_once()
+            time_mod.sleep(self.cfg["data"]["live_poll_seconds"])
+
+        live = {s: self.recorder.history_with_today(s, self.cfg["screen"]["lookback_days"] * 2)
+                for s in self.recorder.symbols}
+        live = {k: v for k, v in live.items() if not v.empty}
+        self.screened = screen_day(self.day, list(live.keys()), live_bars=live)
+        self.recorder.set_screened(self.screened.symbol.tolist())
+        journal_write("screen", {"top": self.screened.symbol.tolist(),
+                               "scores": self.screened.set_index("symbol")["score"].round(4).to_dict()},
+                      day=self.day)
 
         w_end = time.fromisoformat(self.cfg["geometry"]["entry_window"][1])
         close_t = time.fromisoformat(self.cfg["data"]["session_close"])
-        while datetime.now().time() < close_t:
-            now = datetime.now()
+        poll_s = self.cfg["data"]["live_poll_seconds"]
+        last_eval_minute = -1
+        while now_ist().time() < close_t:
+            now = now_ist()
             self.manage_positions()
-            # evaluate on each 15-min boundary within the entry window
-            if now.time() < w_end and now.minute % 15 == 0:
-                self.evaluate(screened, day)
-            time_mod.sleep(30)
-            if not self.positions and datetime.now().time() >= w_end:
-                break
+            if now.time() < w_end and now.minute % 15 == 0 and now.minute != last_eval_minute:
+                self.evaluate()
+                last_eval_minute = now.minute
+            time_mod.sleep(poll_s)
 
-        for sym in list(self.positions):                      # safety square-off
+        for sym in list(self.positions):                  # hard square-off
             q = self.recorder.poll_quotes_once()
             row = q[q.symbol == sym]
-            if not row.empty:
+            if not row.empty and pd.notna(row["ltp"].iloc[0]):
                 self._close(sym, float(row["ltp"].iloc[0]), "time")
         self.recorder.flush_bars()
-        self._post_market(day)
+        self.recorder.reconcile_all()
+        self._post_market()
 
-    def _post_market(self, day: date) -> None:
-        self.gate.update([c["label"] for c in self.closed])
+    def _post_market(self) -> None:
+        labels = [c["label"] for c in self.closed]
+        self.gate.update(labels)
         self.gate.save()
-        out = self.log_dir / f"paper_{day.isoformat()}.json"
+        journal_write("aci_update", {"tau": self.gate.state.tau, "fired_labels": labels}, day=self.day)
+
+        out = self.log_dir / f"paper_{self.day.isoformat()}.json"
         out.write_text(json.dumps(self.closed, indent=2, default=str))
+
+        # kill switches (B-7 — first live caller) over the full paper history
+        all_trades = self._all_paper_trades()
+        bt_wr = self._backtest_win_rate()
+        breaches = check_kill_switches(all_trades, bt_wr)
+        if breaches:
+            logger.error("kill switches breached: %s", breaches)
+
+        # drift check (B-7 switch c)
+        try:
+            from src.intraday.drift import run_check
+            run_check(self.day)
+        except Exception as e:  # noqa: BLE001 — drift infra optional in local runs
+            logger.warning("drift check skipped: %s", e)
+
+        seal_day(self.day)
         n = len(self.closed)
-        wr = sum(c["label"] for c in self.closed) / n if n else float("nan")
+        wr = sum(labels) / n if n else float("nan")
         logger.info("session done: %d trades, win rate %.2f → %s", n, wr, out.name)
+
+    def _all_paper_trades(self) -> pd.DataFrame:
+        rows = []
+        for f in sorted(self.log_dir.glob("paper_*.json")):
+            try:
+                d = date.fromisoformat(f.stem.replace("paper_", ""))
+            except ValueError:
+                continue
+            for rec in json.loads(f.read_text()):
+                rows.append({"date": d, "label": int(rec["label"]),
+                             "pnl_pct_net": float(rec["pnl_pct_net"])})
+        return pd.DataFrame(rows)
+
+    def _backtest_win_rate(self) -> float:
+        reg = ROOT / self.cfg["paths"]["run_registry"]
+        if reg.exists():
+            df = pd.read_csv(reg)
+            passed = df[df["all_pass"] == True]  # noqa: E712
+            if not passed.empty:
+                return float(passed["win_rate"].iloc[-1])
+        return self.cfg["gates"]["min_win_rate"]
 
 
 def run(capital_inr: float = 1_000_000) -> None:

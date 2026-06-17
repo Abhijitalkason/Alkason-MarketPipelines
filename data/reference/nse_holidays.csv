@@ -1,0 +1,45 @@
+# NSE trading holidays — consumed by bhavcopy.backfill_bhavcopies raise-on-miss
+# (v3_supplementry 3.3). One row per holiday; maintained yearly from the NSE
+# trading-holiday list. Without this file the bhavcopy backfill cannot tell a
+# holiday from a data hole and refuses to run.
+date,description
+2024-01-26,Republic Day
+2024-03-08,Mahashivratri
+2024-03-25,Holi
+2024-03-29,Good Friday
+2024-04-11,Id-Ul-Fitr
+2024-04-17,Ram Navami
+2024-05-01,Maharashtra Day
+2024-06-17,Bakri Id
+2024-07-17,Muharram
+2024-08-15,Independence Day
+2024-10-02,Gandhi Jayanti
+2024-11-01,Diwali Laxmi Pujan
+2024-11-15,Gurunanak Jayanti
+2024-12-25,Christmas
+2025-02-26,Mahashivratri
+2025-03-14,Holi
+2025-03-31,Id-Ul-Fitr
+2025-04-10,Mahavir Jayanti
+2025-04-14,Ambedkar Jayanti
+2025-04-18,Good Friday
+2025-05-01,Maharashtra Day
+2025-08-15,Independence Day
+2025-08-27,Ganesh Chaturthi
+2025-10-02,Gandhi Jayanti / Dussehra
+2025-10-21,Diwali Laxmi Pujan
+2025-11-05,Gurunanak Jayanti
+2025-12-25,Christmas
+2026-01-26,Republic Day
+2026-02-15,Mahashivratri
+2026-03-04,Holi
+2026-03-21,Id-Ul-Fitr
+2026-03-30,Ram Navami
+2026-04-01,Mahavir Jayanti
+2026-04-03,Good Friday
+2026-04-14,Ambedkar Jayanti
+2026-05-01,Maharashtra Day
+2026-08-15,Independence Day
+2026-10-02,Gandhi Jayanti
+2026-11-10,Diwali Laxmi Pujan
+2026-12-25,Christmas
