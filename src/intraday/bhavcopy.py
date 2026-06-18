@@ -116,6 +116,12 @@ def fetch_fo_bhavcopy(d: date, s: requests.Session | None = None) -> pd.DataFram
     if fut.empty:
         raise BhavcopyError(f"F&O bhavcopy {d}: no stock futures rows")
     fut["XpryDt"] = pd.to_datetime(fut["XpryDt"])
+    # near-month = nearest NON-EXPIRED contract; on/after expiry day a stale
+    # expired row can still appear in the file and would otherwise be picked,
+    # giving wrong OI/basis.
+    fut = fut[fut["XpryDt"].dt.date >= d]
+    if fut.empty:
+        raise BhavcopyError(f"F&O bhavcopy {d}: no non-expired stock futures rows")
     near = fut.sort_values("XpryDt").groupby("TckrSymb", as_index=False).first()
     out = near.rename(columns={
         "TckrSymb": "symbol", "ClsPric": "fut_close",

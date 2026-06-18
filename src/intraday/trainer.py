@@ -117,17 +117,28 @@ def train_production(end_day: date | None = None, train_months: int | None = Non
 
 
 def _set_flow_active(active: bool) -> None:
-    """Persist the activation decision back into the config file so blend/gate/
-    features read a consistent flag. Idempotent."""
-    import yaml
+    """Persist the flow-activation decision back into config so blend/gate/features
+    read a consistent flag. Surgical, comment-preserving, atomic:
+      - edits only the single `flow_model_active:` line (a full YAML re-dump would
+        strip every comment in the file);
+      - writes via a temp file + os.replace so a concurrent reader never sees a
+        half-written config.
+    Note: load_config.cache_clear() only affects THIS process — a separately
+    running serve/paper process keeps its cached flag until restarted (training
+    and serving are distinct lifecycle events; the bundle also carries the flag)."""
+    import os
+    import re
+
     from src.intraday import CONFIG_PATH
 
-    cfg_text = CONFIG_PATH.read_text()
-    cfg = yaml.safe_load(cfg_text)
-    if cfg["gate"]["flow_model_active"] == active:
-        return
-    cfg["gate"]["flow_model_active"] = active
-    CONFIG_PATH.write_text(yaml.safe_dump(cfg, sort_keys=False))
+    text = CONFIG_PATH.read_text()
+    new = re.sub(r"(^\s*flow_model_active:\s*)(true|false)",
+                 lambda m: f"{m.group(1)}{str(active).lower()}", text, count=1, flags=re.M)
+    if new == text:
+        return  # already at the desired value (or key absent)
+    tmp = CONFIG_PATH.with_suffix(".yaml.tmp")
+    tmp.write_text(new)
+    os.replace(tmp, CONFIG_PATH)
     load_config.cache_clear()
 
 

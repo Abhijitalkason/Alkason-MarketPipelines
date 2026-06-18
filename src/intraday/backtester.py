@@ -282,7 +282,11 @@ def run_backtest(start: date, end: date, stress: bool = False,
             fold_stats.append(fs)
             logger.info("fold %d: %s", k, fs)
 
-    return _finalize(trades, fold_stats, data, stress, start, end, args_note)
+    # Union of EVERY test-fold day (incl. days that fired zero signals) — the
+    # honest coverage denominator (M-4 / PLAN_v3 §12.2). Days with no trades must
+    # still count as "candidate rows we could have traded but didn't."
+    all_test_days = sorted({d for _, test_days in folds for d in test_days})
+    return _finalize(trades, fold_stats, data, stress, start, end, args_note, all_test_days)
 
 
 def _refit_rank(day_rows: pd.DataFrame, weights: dict, top_n: int) -> pd.DataFrame:
@@ -317,14 +321,17 @@ def _tod_bucket(entry_ts) -> str:
     return "1030-1100"
 
 
-def _finalize(trades, fold_stats, data, stress, start, end, args_note) -> dict:
+def _finalize(trades, fold_stats, data, stress, start, end, args_note, all_test_days=None) -> dict:
     cfg = load_config()
     g = cfg["gates"]
     tdf = pd.DataFrame(trades)
     if tdf.empty:
         raise RuntimeError("backtest emitted 0 trades — gate too tight or edge absent (Gate 3 fails honestly)")
 
-    test_days = set(tdf.date.unique())
+    # denominator = ALL candidate rows across ALL test windows (not just days
+    # that produced a trade) — otherwise zero-signal days vanish and coverage is
+    # overstated. Fall back to traded days only if the caller didn't pass folds.
+    test_days = set(all_test_days) if all_test_days is not None else set(tdf.date.unique())
     test_rows = len(data[data.date.isin(test_days)])
     coverage = len(tdf) / max(1, test_rows)
     win_rate = float(tdf.label.mean())
@@ -385,7 +392,7 @@ def _finalize(trades, fold_stats, data, stress, start, end, args_note) -> dict:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     (out_dir / f"backtest_{stamp}.json").write_text(json.dumps(report, indent=2, default=str))
     tdf.to_parquet(out_dir / f"trades_{stamp}.parquet", index=False)
-    _write_artifacts(tdf, data, out_dir, stamp)
+    _write_artifacts(tdf, test_rows, out_dir, stamp)
     _excluded_symbols_file(excluded)
     _append_run_registry(report, stress, args_note, stamp)
     logger.info("backtest report → %s (gates: %s)", out_dir / f"backtest_{stamp}.json", report["gates"])
@@ -395,7 +402,13 @@ def _finalize(trades, fold_stats, data, stress, start, end, args_note) -> dict:
 def _fairness_tables(tdf: pd.DataFrame) -> dict:
     """Per symbol/sector/vol-regime/time-of-day: n, win rate, expectancy, mean p_cal (H-5)."""
     tdf = tdf.copy()
-    tdf["vol_regime"] = pd.qcut(tdf["atr_pct"], 3, labels=["low", "mid", "high"], duplicates="drop")
+    # qcut into 3 vol terciles, but a fold with few trades / near-constant ATR may
+    # not yield 3 distinct edges — with explicit labels that raises ValueError and
+    # would abort the whole report. Fall back to a single regime in that case.
+    try:
+        tdf["vol_regime"] = pd.qcut(tdf["atr_pct"], 3, labels=["low", "mid", "high"], duplicates="drop")
+    except ValueError:
+        tdf["vol_regime"] = "all"
     out = {}
     for key in ["symbol", "sector", "vol_regime", "tod_bucket"]:
         grp = tdf.groupby(key, observed=True)
@@ -459,8 +472,10 @@ def _config_hash() -> str:
     return hashlib.sha256(json.dumps(load_config(), sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
-def _write_artifacts(tdf: pd.DataFrame, data: pd.DataFrame, out_dir: Path, stamp: str) -> None:
-    """Win-rate-vs-coverage frontier + calibration reliability diagram (PNGs)."""
+def _write_artifacts(tdf: pd.DataFrame, test_rows: int, out_dir: Path, stamp: str) -> None:
+    """Win-rate-vs-coverage frontier + calibration reliability diagram (PNGs).
+    Coverage axis uses the same denominator as the headline metric: candidate
+    rows on test days only (not train+test)."""
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -471,7 +486,7 @@ def _write_artifacts(tdf: pd.DataFrame, data: pd.DataFrame, out_dir: Path, stamp
 
     # frontier: sweep p_cal threshold, plot (coverage, win rate)
     thresholds = np.linspace(tdf["p_cal"].min(), tdf["p_cal"].max(), 25)
-    total = max(1, len(data))
+    total = max(1, test_rows)
     cov, wr = [], []
     for t in thresholds:
         sub = tdf[tdf["p_cal"] >= t]

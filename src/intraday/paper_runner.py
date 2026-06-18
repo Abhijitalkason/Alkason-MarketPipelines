@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time as time_mod
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
@@ -151,15 +152,34 @@ class PaperRunner:
             "entry_ts": now_ist().isoformat(),
             "t_bar": (now_ist() + timedelta(hours=geo["time_barrier_hours"])).isoformat(),
             "p_cal": p_cal,
+            "last_ltp": entry,   # last known mark — square-off falls back to it if the quote dies
             "features": row.drop(columns=["symbol", "ts", "date"], errors="ignore").iloc[0].to_dict(),
         }
         self.risk.on_open(sym)
-        journal_write("fill", {"symbol": sym, "direction": direction, "entry": entry,
-                              "qty": qty, "p_cal": p_cal, "shap_top": shap,
-                              "quoted_bid": float(q["bid"].iloc[0]),
-                              "quoted_ask": float(q["ask"].iloc[0])}, day=self.day)
+        fill_payload = {"symbol": sym, "direction": direction, "entry": entry,
+                        "qty": qty, "p_cal": p_cal, "shap_top": shap,
+                        "quoted_bid": float(q["bid"].iloc[0]),
+                        "quoted_ask": float(q["ask"].iloc[0])}
+        journal_write("fill", fill_payload, day=self.day)
+        self._explain_async(fill_payload)        # PLAN_v3 §15: fired-signal narration, off the decision path
         self._persist_state()
         logger.info("PAPER OPEN %s dir=%+d entry=%.2f qty=%d p=%.3f", sym, direction, entry, qty, p_cal)
+
+    def _explain_async(self, fill_payload: dict) -> None:
+        """Granite narration of a FIRED signal, generated on a background thread
+        (never on the decision path) and appended as a journal `explain` event,
+        surfaced by GET /signals/today (PLAN_v3 §15). Failure is non-fatal."""
+        day = self.day
+
+        def _run() -> None:
+            try:
+                from src.slm.explainer import explain_signal
+                text = explain_signal(fill_payload)
+                journal_write("explain", {"symbol": fill_payload["symbol"], "text": text}, day=day)
+            except Exception as e:  # noqa: BLE001 — explanation is UX, never gating
+                logger.warning("explain failed for %s: %s", fill_payload.get("symbol"), e)
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def manage_positions(self) -> None:
         if not self.positions:
@@ -173,6 +193,7 @@ class PaperRunner:
                 logger.warning("no quote to manage %s this cycle", sym)
                 continue
             ltp = float(q["ltp"].iloc[0])
+            pos["last_ltp"] = ltp   # remember the mark for a stale-quote square-off
             now = now_ist()
             d = pos["direction"]
             reason = None
@@ -197,10 +218,14 @@ class PaperRunner:
         net = gross - cost
         pnl_inr = net * pos["entry"] * pos["qty"]
         self.risk.on_close(sym, pnl_inr)
+        # Label MUST match the backtest/labeler convention exactly (train==serve):
+        # time-barrier exit is labelled on GROSS PnL sign (pre-cost), never net —
+        # net would make the win/loss feeding the ACI gate and kill switches mean
+        # something different live than in training. Expectancy uses net separately.
         rec = {**{k: v for k, v in pos.items() if k != "features"},
                "exit": exit_price, "barrier": reason, "exit_ts": now_ist().isoformat(),
                "pnl_pct_gross": gross, "cost_pct": cost, "pnl_pct_net": net,
-               "label": int(net > 0) if reason == "time" else int(reason == "target"),
+               "label": int(gross > 0) if reason == "time" else int(reason == "target"),
                "features": pos["features"]}
         self.closed.append(rec)
         journal_write("exit", {"symbol": sym, "barrier": reason, "exit": exit_price,
@@ -236,23 +261,43 @@ class PaperRunner:
                                "scores": self.screened.set_index("symbol")["score"].round(4).to_dict()},
                       day=self.day)
 
+        w_start = time.fromisoformat(self.cfg["geometry"]["entry_window"][0])
         w_end = time.fromisoformat(self.cfg["geometry"]["entry_window"][1])
         close_t = time.fromisoformat(self.cfg["data"]["session_close"])
         poll_s = self.cfg["data"]["live_poll_seconds"]
-        last_eval_minute = -1
+        # Explicit 15-min decision boundaries in the entry window (09:30, 09:45, …).
+        # Evaluate each one exactly once, on the first poll AT OR AFTER it. A
+        # minute-of-hour dedup would collide (10:30 has the same minute as 09:30)
+        # and silently skip boundaries; this also survives an eval that runs >60s.
+        boundaries, t = [], datetime.combine(self.day, w_start)
+        w_end_dt = datetime.combine(self.day, w_end)
+        while t < w_end_dt:
+            boundaries.append(t.time())
+            t += timedelta(minutes=15)
+        evaluated: set = set()
         while now_ist().time() < close_t:
             now = now_ist()
             self.manage_positions()
-            if now.time() < w_end and now.minute % 15 == 0 and now.minute != last_eval_minute:
+            due = [b for b in boundaries if b <= now.time() and b not in evaluated]
+            if due:
                 self.evaluate()
-                last_eval_minute = now.minute
+                evaluated.update(due)
             time_mod.sleep(poll_s)
 
-        for sym in list(self.positions):                  # hard square-off
+        # Hard square-off — PLAN_v3 §3/§5 "always flat, no exceptions". Every open
+        # position MUST close here; if the quote is dead we close at the last known
+        # mark rather than leaving the position to silently carry overnight risk.
+        for sym in list(self.positions):
             q = self.recorder.poll_quotes_once()
             row = q[q.symbol == sym]
             if not row.empty and pd.notna(row["ltp"].iloc[0]):
                 self._close(sym, float(row["ltp"].iloc[0]), "time")
+            else:
+                mark = self.positions[sym].get("last_ltp", self.positions[sym]["entry"])
+                logger.warning("square-off %s on STALE quote — closing at last mark %.2f", sym, mark)
+                self._close(sym, mark, "time")
+        if self.positions:  # invariant: never carry a position past square-off
+            raise RuntimeError(f"square-off failed to flatten: {list(self.positions)}")
         self.recorder.flush_bars()
         self.recorder.reconcile_all()
         self._post_market()

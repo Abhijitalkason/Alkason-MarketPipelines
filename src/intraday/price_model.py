@@ -69,6 +69,13 @@ class PriceModel:
         cut = _day_cut(X, 0.8)
         X_tr, X_in = X.iloc[:cut], X.iloc[cut:]
         y_tr, y_in = y.iloc[:cut], y.iloc[cut:]
+        # A single-class train or inner-validation block makes tuning degenerate
+        # (log_loss undefined / model can't separate). Skip tuning loudly rather
+        # than crash; the default params still train.
+        if y_tr.nunique() < 2 or y_in.nunique() < 2:
+            logger.warning("tune skipped: single-class inner split (tr=%d, in=%d classes)",
+                           y_tr.nunique(), y_in.nunique())
+            return {}
 
         def objective(trial: "optuna.Trial") -> float:
             p = {
@@ -82,7 +89,8 @@ class PriceModel:
             m = LGBMClassifier(**p)
             m.fit(X_tr[self.FEATURES], y_tr, eval_set=[(X_in[self.FEATURES], y_in)],
                   callbacks=[early_stopping(50), log_evaluation(0)])
-            return log_loss(y_in, m.predict_proba(X_in[self.FEATURES])[:, 1])
+            # labels=[0,1] keeps log_loss defined even if a fold predicts one class
+            return log_loss(y_in, m.predict_proba(X_in[self.FEATURES])[:, 1], labels=[0, 1])
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
         study = optuna.create_study(

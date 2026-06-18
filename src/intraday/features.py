@@ -225,9 +225,14 @@ def features_for_day(symbol: str, day: date, direction: int = 1,
             continue
         if (bar_ts.minute % 15) != 0:   # decision on 15-min closes only
             continue
-        upto = today1[today1.index <= bar_ts + pd.Timedelta("15min") - pd.Timedelta("1min")]
+        entry_ts = bar_ts + pd.Timedelta("15min")
+        upto = today1[today1.index <= entry_ts - pd.Timedelta("1min")]
         c = float(upto["close"].iloc[-1])
-        a = atr[atr.index <= bar_ts].dropna()
+        # ATR as-of the SAME instant the labeler uses to place target/stop
+        # (last 5-min bar closed by entry_ts) — the feature the model sees and the
+        # geometry the label encodes must share one ruler. Still strictly trailing:
+        # the bar labelled (entry_ts-5min) is complete from data < entry_ts.
+        a = atr[atr.index < entry_ts].dropna()
         if a.empty or a.iloc[-1] <= 0:
             continue
         a = float(a.iloc[-1])
@@ -238,7 +243,7 @@ def features_for_day(symbol: str, day: date, direction: int = 1,
         vwap_slope = float(vwap_s.diff(15).iloc[-1] / a) if len(vwap_s) > 15 else 0.0
         above = (upto["close"].tail(30) > vwap_s.tail(30)).mean()
 
-        d5 = df5[df5.index <= bar_ts]
+        d5 = df5[df5.index < entry_ts]   # same as-of as ATR/VWAP — one ruler for the whole row
         closes = d5["close"]
         hod = float(upto["high"].max())
         lod = float(upto["low"].min())
@@ -268,7 +273,7 @@ def features_for_day(symbol: str, day: date, direction: int = 1,
             "ret_6b": float(closes.pct_change(6).iloc[-1]),
             "ret_12b": float(closes.pct_change(12).iloc[-1]) if len(closes) > 12 else np.nan,
             "accel": float(closes.pct_change(1).iloc[-1] - closes.pct_change(1).iloc[-2]) if len(closes) > 2 else 0.0,
-            "rsi14_5m": float(rsi[rsi.index <= bar_ts].iloc[-1]) if not rsi[rsi.index <= bar_ts].dropna().empty else np.nan,
+            "rsi14_5m": float(rsi[rsi.index < entry_ts].iloc[-1]) if not rsi[rsi.index < entry_ts].dropna().empty else np.nan,
             "hod_proximity": (hod - c) / a,
             "lod_proximity": (c - lod) / a,
             "day_of_week": float(bar_ts.dayofweek),
@@ -316,6 +321,11 @@ def build_matrix(plan: pd.DataFrame, require_flow: bool | None = None) -> pd.Dat
             f = features_for_day(r["symbol"], r["date"], int(r["direction"]))
             if not f.empty:
                 frames.append(f)
+            # An empty return is an EXPECTED outcome (insufficient warm-up history,
+            # no opening-range bars yet) — not an exception, so it is NOT counted
+            # against the skip tolerance (M-1 §4.3 counts feature *exceptions*).
+            # Genuine bar holes are caught upstream by validate_1min /
+            # cross_check_bhavcopy, not by silently shrinking the matrix here.
         except FlowDataError:
             raise  # structural problem — never count this as a row skip
         except Exception as e:  # noqa: BLE001 — counted, raises over tolerance below

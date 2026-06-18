@@ -93,7 +93,7 @@ def run_check(day: date | None = None) -> dict:
     if breach:
         _set_recalib_flag()
         _append_alert(day, summary)
-        if _consecutive_breaches() >= cfg["consecutive_breaches_to_halt"]:
+        if _consecutive_breaches(day) >= cfg["consecutive_breaches_to_halt"]:
             _persist_halt(["drift"])
             summary["halted"] = True
     else:
@@ -164,12 +164,18 @@ def _streak_file() -> Path:
     return _state_dir() / "drift_breach_streak.json"
 
 
-def _consecutive_breaches() -> int:
+def _consecutive_breaches(day: date) -> int:
+    """Count consecutive breaching SESSIONS, keyed by date — so running the
+    drift check twice in one day (e.g. `--mode drift` plus the paper post-market)
+    cannot double-increment the streak and trip the halt on a single day."""
     f = _streak_file()
-    n = (json.loads(f.read_text())["streak"] if f.exists() else 0) + 1
-    f.write_text(json.dumps({"streak": n}))
+    state = json.loads(f.read_text()) if f.exists() else {"streak": 0, "last_day": None}
+    if state.get("last_day") == day.isoformat():
+        return state["streak"]            # already counted this session
+    n = state.get("streak", 0) + 1
+    f.write_text(json.dumps({"streak": n, "last_day": day.isoformat()}))
     return n
 
 
 def _clear_breach_streak() -> None:
-    _streak_file().write_text(json.dumps({"streak": 0}))
+    _streak_file().write_text(json.dumps({"streak": 0, "last_day": None}))

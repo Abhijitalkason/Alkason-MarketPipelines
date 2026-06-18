@@ -197,14 +197,25 @@ class SessionRecorder:
 
     def reconcile_all(self) -> None:
         """Post-close: replace each recorded symbol's provisional bars with
-        official candles + bhavcopy cross-check (the live skew detector)."""
+        official candles + bhavcopy cross-check (the live skew detector).
+
+        One symbol's failure must not abort the rest, but failures are COUNTED
+        and a wholesale failure RAISES — silent reconcile loss would leave
+        provisional bars in the store with no alarm (no-silent-degradation)."""
         from src.intraday.data_feed import reconcile_day
         recorded = self._screened or self.symbols
+        failed = []
         for sym in recorded:
             try:
                 reconcile_day(sym, self.day, self.feed)
-            except Exception as e:  # noqa: BLE001 — one symbol's reconcile must not abort the rest
+            except Exception as e:  # noqa: BLE001 — counted; wholesale failure raises below
                 logger.error("reconcile %s failed: %s", sym, e)
+                failed.append(sym)
+        if recorded and len(failed) > len(recorded) * 0.5:
+            raise RuntimeError(
+                f"reconcile failed for {len(failed)}/{len(recorded)} recorded symbols "
+                f"— provisional bars remain unverified; investigate the feed before next session"
+            )
 
 
 def run() -> None:

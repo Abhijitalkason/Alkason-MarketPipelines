@@ -136,15 +136,30 @@ def _load_fitted_weights() -> dict | None:
     return None
 
 
+def clipped_components(df: pd.DataFrame) -> pd.DataFrame:
+    """The ONE component transform — used by both fit_weights (train) and
+    score_rows (serve), so the screen weights are learned on exactly the values
+    they are later applied to (no train/serve transform skew, PLAN_v3 §7)."""
+    return pd.DataFrame({
+        "vol_z": df["vol_z"].clip(-3, 3),
+        "rng_z": df["rng_z"].clip(-3, 3),
+        "gap_quality": df["gap_quality"],
+        "imbalance_aligned": df["imbalance_aligned"].clip(-1, 1),
+        "delivery_z": df["delivery_z"].clip(-3, 3),
+        "index_alignment": df["index_alignment"],
+    }, index=df.index)[SCORE_COMPONENTS]
+
+
 def score_rows(df: pd.DataFrame, w: dict) -> pd.Series:
     """Score from the component columns — one formula for live and refit ranking."""
+    c = clipped_components(df)
     return (
-        w["volume_surge"] * df["vol_z"].clip(-3, 3)
-        + w["range_expansion"] * df["rng_z"].clip(-3, 3)
-        + w["gap_quality"] * df["gap_quality"]
-        + w["preopen_imbalance"] * df["imbalance_aligned"].clip(-1, 1)
-        + w["delivery_z"] * df["delivery_z"].clip(-3, 3)
-        + w["index_alignment"] * df["index_alignment"]
+        w["volume_surge"] * c["vol_z"]
+        + w["range_expansion"] * c["rng_z"]
+        + w["gap_quality"] * c["gap_quality"]
+        + w["preopen_imbalance"] * c["imbalance_aligned"]
+        + w["delivery_z"] * c["delivery_z"]
+        + w["index_alignment"] * c["index_alignment"]
     )
 
 
@@ -254,7 +269,7 @@ def fit_weights(screen_rows: pd.DataFrame, day_won: pd.Series) -> dict:
     a wrong-signed component is visible, never silent."""
     from sklearn.linear_model import LogisticRegression
 
-    X = screen_rows[SCORE_COMPONENTS].to_numpy(dtype=float)
+    X = clipped_components(screen_rows).to_numpy(dtype=float)   # same transform as score_rows
     y = day_won.to_numpy(dtype=int)
     if len(np.unique(y)) < 2:
         raise ScreenError("fit_weights: outcomes are single-class — cannot fit screen weights")
