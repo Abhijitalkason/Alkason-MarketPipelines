@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
+import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -56,7 +57,7 @@ def gate0() -> GateResult:
     """pytest suite green + dead-control sweep clean + coverage ≥ 85%."""
     detail: dict = {}
     cov = subprocess.run(
-        ["python", "-m", "pytest", "-q", "--cov=src/intraday",
+        [sys.executable, "-m", "pytest", "-q", "--cov=src/intraday",
          "--cov-report=term-missing:skip-covered", "--cov-fail-under=85"],
         cwd=ROOT, capture_output=True, text=True,
     )
@@ -122,11 +123,11 @@ def gate2(train_days: list | None = None) -> GateResult:
     from src.intraday.geometry_study import TrainWindow, choose_geometry, run_grid
 
     if train_days is None:
-        from src.intraday.backtester import build_dataset, make_folds
+        from src.intraday.backtester import build_dataset, make_folds, trading_sessions
         import pandas as pd
         from datetime import timedelta
         from src.intraday import today_ist
-        days = pd.bdate_range(today_ist() - timedelta(days=4 * 365), today_ist()).date.tolist()
+        days = trading_sessions(today_ist() - timedelta(days=4 * 365), today_ist())
         data = build_dataset(days)
         folds = make_folds(sorted(set(pd.to_datetime(data["date"]).dt.date)))
         train_days = folds[0][0]

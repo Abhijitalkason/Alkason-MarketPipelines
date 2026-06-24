@@ -18,6 +18,16 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "config" / "config_v3.yaml"
 
+# Load .env once at package import so UPSTOX_ACCESS_TOKEN (and other secrets) are
+# available to every entry point — backfill, record, paper, serve — not just the
+# FastAPI app. Silent no-op if python-dotenv is absent or .env is missing.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+except ImportError:
+    pass
+
 IST = ZoneInfo("Asia/Kolkata")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")

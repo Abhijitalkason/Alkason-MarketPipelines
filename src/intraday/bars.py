@@ -41,8 +41,10 @@ def load_1min(symbol: str, start: date, end: date, adjusted: bool = True,
               include_provisional: bool = False) -> pd.DataFrame:
     """1-min bars for [start, end], session-filtered, ts-indexed, validated.
 
-    adjusted=True applies corporate-action factors ON READ as explicit columns
-    (adj_factor, close_raw) — storage stays raw (H-2).
+    adjusted=True returns the corp-action-adjusted series (Upstox candles are
+    already back-adjusted at the source, so this is the stored series as-is, with
+    interface columns adj_factor=1.0 + close_raw). adjusted=False un-adjusts to
+    as-traded prices for the bhavcopy cross-check. Storage stays raw (H-2).
     include_provisional=False excludes poll-built bars (training default).
     """
     cfg = load_config()
@@ -69,9 +71,17 @@ def load_1min(symbol: str, start: date, end: date, adjusted: bool = True,
         raise BarValidationError(f"{symbol}: 0 non-provisional session bars for {start}..{end}")
     validate_1min(symbol, df)
     if adjusted:
-        from src.intraday.corporate_actions import apply as ca_apply
+        # Upstox candles are already corp-action adjusted at the source — the
+        # stored series IS the adjusted series. Re-applying factors here would
+        # double-adjust (verified WIPRO 201.30 → 100.65). Expose interface
+        # columns only; no price change.
+        df = df.copy()
+        df["close_raw"] = df["close"]
+        df["adj_factor"] = 1.0
+    else:
+        from src.intraday.corporate_actions import to_as_traded
 
-        df = ca_apply(df, symbol)
+        df = to_as_traded(df, symbol)
     return df
 
 
@@ -118,11 +128,19 @@ def cross_check_bhavcopy(symbol: str, day: date, df_1min: pd.DataFrame) -> float
     day_bars = df_1min[df_1min.index.date == day]
     if day_bars.empty:
         raise BarValidationError(f"{symbol}: no 1-min bars on {day}")
-    # compare RAW close — bhavcopy is as-traded
+    # compare RAW close — bhavcopy is as-traded. NSE's official close_price is the
+    # VWAP of the last 30 min (15:00–15:30), NOT the last traded price, so we must
+    # compare against that aggregate (PLAN_v3 §6.2 "daily aggregate"); the last
+    # 1-min tick routinely differs from the official close by 0.1–0.4%.
     close_col = "close_raw" if "close_raw" in day_bars.columns else "close"
-    mismatch = abs(float(day_bars[close_col].iloc[-1]) - float(row["close_price"].iloc[0])) / float(
-        row["close_price"].iloc[0]
-    )
+    closing_window = day_bars.between_time("15:00", "15:30")
+    vol = closing_window["volume"].sum() if not closing_window.empty else 0
+    if vol > 0:
+        ref_close = float((closing_window[close_col] * closing_window["volume"]).sum() / vol)
+    else:  # half-day / no closing-auction volume → fall back to last tick
+        ref_close = float(day_bars[close_col].iloc[-1])
+    bh_close = float(row["close_price"].iloc[0])
+    mismatch = abs(ref_close - bh_close) / bh_close
     if mismatch > 0.001:
         raise BarValidationError(f"{symbol} {day}: close mismatch vs bhavcopy {mismatch:.4%}")
     return mismatch

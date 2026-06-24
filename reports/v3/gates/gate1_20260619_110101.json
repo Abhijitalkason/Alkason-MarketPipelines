@@ -1,0 +1,12 @@
+{
+  "gate": "gate1",
+  "passed": false,
+  "detail": {
+    "names_ok": 0,
+    "mismatches": [],
+    "reconcile_alerts": []
+  },
+  "evidence_paths": [],
+  "stamp": "20260619_110101",
+  "ts": "2026-06-19T11:01:01"
+}

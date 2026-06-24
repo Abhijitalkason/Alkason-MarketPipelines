@@ -1,13 +1,16 @@
 """Corporate-action adjustment factors (v3_supplementry §3.5, H-2).
 
-Storage is NEVER adjusted in place — v1's adjustment-seam bug is impossible by
-construction. Factors are applied on read by bars.load_1min(adjusted=True) as
-explicit columns: adj_factor, adjusted o/h/l/c, close_raw retained.
+Upstox 1-min candles are corporate-action *back-adjusted at the source*, so the
+stored series IS the adjusted series — load_1min(adjusted=True) returns it
+unchanged (re-applying factors double-adjusts; that was a real bug). The factor
+table is used the OTHER direction: load_1min(adjusted=False) calls to_as_traded
+to recover as-traded prices for the bhavcopy cross-check. Storage is never
+mutated — v1's adjustment-seam bug stays impossible by construction.
 
 Factor convention: factor = post-event price / pre-event price for the action
-(1:2 split → 0.5; 1:1 bonus → 0.5). Prices strictly before the ex-date are
-multiplied by the cumulative product of all factors with ex_date > ts;
-volume is divided by the same factor.
+(1:2 split → 0.5; 1:1 bonus → 0.5). To un-adjust, prices strictly before the
+ex-date are divided by the cumulative product of all factors with ex_date > ts;
+volume is multiplied by the same factor.
 
 Table file: data/reference/corporate_actions.csv
     symbol,ex_date,purpose,factor
@@ -88,10 +91,11 @@ def build_table(start: date, end: date) -> pd.DataFrame:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         old = pd.read_csv(path, comment="#", parse_dates=["ex_date"])
-        old["ex_date"] = old["ex_date"].dt.date
-        out = pd.concat([old, out], ignore_index=True).drop_duplicates(
-            subset=["symbol", "ex_date"], keep="last"
-        )
+        if not old.empty:  # header-only file → nothing to merge (ex_date stays object)
+            old["ex_date"] = pd.to_datetime(old["ex_date"]).dt.date
+            out = pd.concat([old, out], ignore_index=True).drop_duplicates(
+                subset=["symbol", "ex_date"], keep="last"
+            )
     out.sort_values(["symbol", "ex_date"]).to_csv(path, index=False)
     load_factors.cache_clear()
     logger.info("corporate-action table: %d price-affecting rows → %s", len(out), path.name)
@@ -110,19 +114,25 @@ def load_factors(symbol: str) -> tuple[tuple[date, float], ...]:
     return tuple((d.date(), float(f)) for d, f in zip(df["ex_date"], df["factor"]))
 
 
-def apply(df_1min: pd.DataFrame, symbol: str) -> pd.DataFrame:
-    """Adjusted view of a ts-indexed 1-min frame. Adds adj_factor + close_raw;
-    o/h/l/c become adjusted, volume divided by factor. Input is not mutated."""
+def to_as_traded(df_1min: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    """Recover AS-TRADED prices from Upstox's already-adjusted 1-min candles.
+
+    Upstox returns corporate-action *back-adjusted* historical bars (verified
+    WIPRO/NESTLEIND/BAJFINANCE 2026-06: a pre-bonus close equals the as-traded
+    close × the bonus factor). NSE bhavcopy is as-traded, so to cross-check (and
+    for any as-traded consumer) we UN-adjust: prices strictly before an ex_date
+    are divided by that action's factor; volume is multiplied. Input not mutated.
+    Adds: close_adj (the adjusted series), unadj_factor."""
     factors = load_factors(symbol)
     out = df_1min.copy()
-    out["close_raw"] = out["close"]
-    out["adj_factor"] = 1.0
+    out["close_adj"] = out["close"]
+    out["unadj_factor"] = 1.0
     if not factors:
         return out
     for ex_date, factor in factors:
         mask = out.index.normalize() < pd.Timestamp(ex_date)
-        out.loc[mask, "adj_factor"] *= factor
+        out.loc[mask, "unadj_factor"] *= factor
     for col in ("open", "high", "low", "close"):
-        out[col] = out[col] * out["adj_factor"]
-    out["volume"] = (out["volume"] / out["adj_factor"]).round().astype("int64")
+        out[col] = out[col] / out["unadj_factor"]
+    out["volume"] = (out["volume"] * out["unadj_factor"]).round().astype("int64")
     return out

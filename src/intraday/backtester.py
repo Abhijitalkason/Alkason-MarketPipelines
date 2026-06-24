@@ -52,6 +52,8 @@ def build_dataset(days: list[date], symbols: list[str] | None = None) -> pd.Data
     the rest of the day still trades."""
     rows = []
     skipped_days = 0
+    label_attempts = 0
+    label_skips = 0
     for day in days:
         if is_blackout(day):                       # market-wide blackout → skip day
             continue
@@ -72,8 +74,16 @@ def build_dataset(days: list[date], symbols: list[str] | None = None) -> pd.Data
             continue
         screen_cols = top.set_index("symbol")[SCORE_COMPONENTS + ["score"]]
         for sym, g in feats.groupby("symbol"):
+            label_attempts += 1
             direction = int(plan[plan.symbol == sym]["direction"].iloc[0])
-            outs = outcomes_frame(label_day(sym, day, {ts: direction for ts in g["ts"]}))
+            try:
+                outs = outcomes_frame(label_day(sym, day, {ts: direction for ts in g["ts"]}))
+            except Exception as e:  # noqa: BLE001 — counted; raises over tolerance below.
+                # one symbol-day with feed gaps must not abort a multi-year build
+                # (mirrors the screen-loop skip discipline above).
+                label_skips += 1
+                logger.warning("dataset: label %s %s failed (%s)", sym, day, e)
+                continue
             if outs.empty:
                 continue
             g = g.copy()
@@ -88,11 +98,17 @@ def build_dataset(days: list[date], symbols: list[str] | None = None) -> pd.Data
             f"{skipped_days}/{len(days)} days failed screening "
             f"(> {load_config()['data']['max_skip_share']:.0%}) — check bar store coverage"
         )
+    max_skip = load_config()["data"]["max_skip_share"]
+    if label_attempts and label_skips > label_attempts * max_skip:
+        raise RuntimeError(
+            f"{label_skips}/{label_attempts} symbol-days failed labeling "
+            f"(> {max_skip:.0%}) — check bar store coverage"
+        )
     if not rows:
         raise RuntimeError("dataset assembly produced 0 rows — check bar store coverage")
     out = pd.concat(rows, ignore_index=True).sort_values("entry_ts").reset_index(drop=True)
-    logger.info("dataset: %d rows, %d days, base win rate %.3f",
-                len(out), out.date.nunique(), out.label.mean())
+    logger.info("dataset: %d rows, %d days, base win rate %.3f (label skips %d/%d)",
+                len(out), out.date.nunique(), out.label.mean(), label_skips, label_attempts)
     return out
 
 
@@ -202,13 +218,43 @@ def _fit_fold_screen_weights(train_df: pd.DataFrame) -> dict | None:
 
 # ── the walk-forward run ──────────────────────────────────────────────
 
+def trading_sessions(start: date, end: date) -> list[date]:
+    """Actual NSE trading days in [start, end]. Using pd.bdate_range alone counts
+    market holidays as candidate days, which then fail screening (no bars) and
+    falsely trip the coverage guard.
+
+    Primary source: bhavcopy presence on disk (a file exists iff the market
+    traded that day) — authoritative in production. Fallback (e.g. test fixtures
+    that build bars but no bhavcopy): the bar store's own session dates. Both are
+    holiday-free by construction."""
+    cfg = load_config()
+    biz = pd.bdate_range(start, end).date.tolist()
+    base = Path(cfg["data"]["bhavcopy_path"])
+    base = base if base.is_absolute() else ROOT / base
+    days = [d for d in biz if (base / f"eq_{d.isoformat()}.parquet").exists()]
+    if days:
+        return days
+    # no bhavcopy on disk → derive the calendar from days the bar store has data
+    bars_base = Path(cfg["data"]["bars_path"])
+    bars_base = bars_base if bars_base.is_absolute() else ROOT / bars_base
+    biz_set = set(biz)
+    have: set[date] = set()
+    for sym_dir in bars_base.glob("*"):
+        if not sym_dir.is_dir():
+            continue
+        for pq in sym_dir.glob("*.parquet"):
+            ts = pd.to_datetime(pd.read_parquet(pq, columns=["ts"])["ts"]).dt.date
+            have.update(d for d in ts.unique() if d in biz_set)
+    return sorted(have)
+
+
 def run_backtest(start: date, end: date, stress: bool = False,
                  capital_per_trade_inr: float = 100_000, tune: bool | None = None,
                  args_note: str = "") -> dict:
     cfg = load_config()
-    all_days = pd.bdate_range(start, end).date.tolist()
+    all_days = trading_sessions(start, end)
 
-    logger.info("assembling dataset %s → %s (%d candidate days)", start, end, len(all_days))
+    logger.info("assembling dataset %s → %s (%d trading days)", start, end, len(all_days))
     data = build_dataset(all_days)
     data["date"] = pd.to_datetime(data["date"]).dt.date
     folds = make_folds(sorted(data["date"].unique()))

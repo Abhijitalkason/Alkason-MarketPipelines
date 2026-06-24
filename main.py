@@ -70,11 +70,11 @@ def cmd_screen(args):
 
 def cmd_geometry_study(args):
     import pandas as pd
-    from src.intraday.backtester import build_dataset, make_folds
+    from src.intraday.backtester import build_dataset, make_folds, trading_sessions
     from src.intraday.geometry_study import TrainWindow, choose_geometry, run_grid
     end = date.fromisoformat(args.end) if args.end else _today()
     start = date.fromisoformat(args.start) if args.start else end - timedelta(days=4 * 365)
-    data = build_dataset(pd.bdate_range(start, end).date.tolist())
+    data = build_dataset(trading_sessions(start, end))
     folds = make_folds(sorted(set(pd.to_datetime(data["date"]).dt.date)))
     grid = run_grid(TrainWindow(folds[0][0]))
     print(grid.to_string(index=False))

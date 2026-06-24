@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.intraday import ROOT, load_config, today_ist
-from src.intraday.backtester import build_dataset, fit_fold
+from src.intraday.backtester import build_dataset, fit_fold, trading_sessions
 from src.intraday.blend import Blender
 from src.intraday.conformal_gate import ACIGate
 from src.intraday.features import FLOW_PRESENT, flow_real_share
@@ -52,7 +52,7 @@ def train_production(end_day: date | None = None, train_months: int | None = Non
     end_day = end_day or today_ist()
     train_months = train_months or cfg["training"]["train_min_months"]
     start_day = end_day - timedelta(days=int(train_months * 30.44))
-    days = pd.bdate_range(start_day, end_day).date.tolist()
+    days = trading_sessions(start_day, end_day)  # real NSE sessions, not raw weekdays
 
     # 1–2. dataset (all integrity checks live in build_dataset; flow inactive so
     # build_matrix does not yet require the flow floor)
