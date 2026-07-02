@@ -1,0 +1,103 @@
+This is a domain question rather than a code one — here's what discretionary intraday traders actually watch, grouped by category. I've flagged which ones your system already computes as features, since that connects back to what we've been looking at.
+
+1. Price action & levels
+Opening range (first 5–15 min high/low) — breakouts/breakdowns from it ✅ in features
+Pre-market / previous day levels — prev close, prev day high/low, overnight gap
+Support & resistance — round numbers, prior swing highs/lows, VWAP
+Candlestick patterns — engulfing, pin bars, inside bars, doji at key levels
+Trend structure — higher-highs/higher-lows vs lower-highs/lower-lows
+2. VWAP & moving averages
+VWAP — the intraday fair-value line; price above = bullish bias, below = bearish; distance from VWAP, slope, and reclaim/rejection ✅ in features
+Intraday EMAs (9/20 EMA) — dynamic trend and pullback entries
+3. Volume
+Relative volume (RVOL) — today's volume vs the same time-of-day average; the single most important "is this stock in play?" filter ✅ in features (cumvol vs norm)
+Volume spikes confirming a breakout (breakout on high volume = real; on low volume = suspect)
+Volume profile / VPOC — where the most volume traded (magnet levels)
+4. Momentum & oscillators
+RSI — overbought/oversold, and divergences ✅ in features
+Rate of change / return ladder — 1/3/5/15-min momentum ✅ in features
+MACD — momentum shifts
+5. Gaps
+Gap up/down % and whether it's likely to fill or run ✅ in features (gap %, gap filled fraction)
+Gap classification: breakaway vs exhaustion gap
+6. Order flow & market depth (the hard-to-get, high-value stuff)
+Level 2 / order book — bid/ask sizes, imbalance ✅ recorded (L2 depth), but note: real edge here is HFT-owned
+Time & sales (tape) — speed and size of prints
+Bid-ask spread — liquidity/cost signal ✅ liquidity floor in screener
+Pre-open order imbalance ✅ in features
+7. Context / cross-market (regime)
+Index direction — NIFTY/Bank NIFTY; is the stock aligned with the market? ✅ in features
+Sector strength — is the whole sector moving? ✅ sector alignment
+India VIX — volatility regime ✅ daily system
+Global cues — SGX/GIFT Nifty, overnight US (S&P/Nasdaq), Asian markets ✅ daily system (global_data)
+8. Positioning & flows (F&O)
+Open interest changes — long/short buildup ✅ in features
+Futures basis / premium-discount ✅ in features
+PCR, option OI at strikes / max-pain — support/resistance from options
+Delivery % — conviction vs speculative churn ✅ in features
+FII/DII flows ✅ in features
+9. News & catalysts
+Earnings, results, guidance — biggest single-stock movers
+Corporate actions, block deals, analyst upgrades/downgrades
+Macro events — RBI policy, budget, Fed, CPI (traders avoid or trade the volatility) ✅ event blackout in risk layer
+10. Risk / execution discipline (not "signals" but what pros obsess over)
+Liquidity — can I get in/out without slippage? ✅ liquidity floor
+Stop-loss placement relative to ATR/volatility ✅ ATR-based barriers
+Position sizing — fixed risk per trade ✅ risk.py
+Time of day — first hour (volatile), midday (chop, avoid), last hour (trend/square-off)
+The honest connection to your system: it already encodes most of categories 1–3, 5, 7, 8 as numeric features, plus the discipline items in 10. The two categories that are hardest and where the plan concluded intraday edge dies are #6 order flow (millisecond microstructure owned by co-located HFT — unreachable from 1-min bars) and #9 news (priced in within seconds intraday). That's precisely why the project pivoted the news/sentiment signal to the daily/swing horizon, where post-event drift plays out over days instead of seconds.
+
+Want me to map this list against the exact feature columns in src/intraday/features.py so you can see which datapoints are captured and which aren't?
+
+Deeply analyze all the input source in the project and check are the above  all categories are considered or not and is every input source is taken from separate files or combined?
+
+I'll deeply analyze the actual feature-engineering and ingestion code in both systems to build an evidence-backed coverage matrix against those 10 categories, and determine the file organization. Let me launch two parallel investigations.
+
+
+Ran 2 agents
+Here's the deep analysis. I read the full feature-engineering code in both systems and mapped every input against the 10 categories. Two clear answers below: (1) category coverage, and (2) the separate-vs-combined file architecture.
+
+Answer 1: Are all 10 categories considered?
+No — coverage is partial, and it differs by system. The intraday system covers price/volume/momentum/gaps/F&O well but is thin on context and has zero news; the daily system adds the global + macro + news layers that intraday lacks. Combined coverage:
+
+#	Category	Intraday	Daily	Combined verdict
+1	Price action & levels	◑ OR, HOD/LOD, gaps	◑ returns ladder, 52w pos	Partial — no trend structure (HH/HL), no swing/pivot levels
+2	VWAP & moving averages	◑ VWAP dist/slope	◑ MA20/MA50, ATR	Partial — no intraday EMAs, no 200-MA, no ADX
+3	Volume	◑ RVOL, vol slope	◑ vol ratio, delivery z, turnover z	Partial — no volume profile/VPOC, no buy/sell split
+4	Momentum & oscillators	◑ RSI, return ladder, accel	◑ RSI only	Partial — no MACD, Stochastic, ROC anywhere
+5	Gaps	● gap %, fill frac, agree, quality	◑ gap_prev	Intraday: full; daily: yesterday only
+6	Order flow & depth	◑ pre-open imbalance, spread, L2 stored not featurized	✗ N/A at daily	Partial — L2 depth recorded but never turned into features; no tape
+7	Context / cross-market	○ index_alignment (universe proxy only)	● SPX, NDX, Asia, VIX, DXY, USDINR, crude, gold, US10Y	Daily strong, intraday minimal — no NIFTY/sector beta, no breadth; GIFT Nifty omitted (no free feed)
+8	Positioning / F&O	◑ OI z, basis, delivery z, FII z	◑ OI z, basis, FII z	Partial — no PCR, no max-pain, no option OI in either
+9	News & catalysts	✗ none	◑ macro calendar (days-to/since RBI/CPI/Fed), earnings dates, monsoon; sentiment scaffolded but offline	Daily only, and incomplete — dates only, no surprise magnitude; FinBERT sentiment disabled; no analyst/guidance/regulatory
+10	Risk / execution	◑ liquidity floor, ATR, sizing in config	◑ per-horizon costs	Partial — sizing/costs live outside the feature row
+● full ◑ partial ○ minimal ✗ none
+
+The biggest genuine gaps (not captured anywhere): PCR / option-chain positioning, MACD & multi-timeframe trend structure, volume profile/VPOC, live L2 order-flow features (data is recorded but never computed into features), and live news sentiment (the pipeline exists but no source is connected). Note also the intraday "index" is a universe-median proxy, not a real NIFTY feed — a known deviation in the code.
+
+Answer 2: Separate files or combined?
+Both — the pattern is "separate files on disk, combined per-row in memory." No source is pre-merged into one master file; each feed keeps its own file(s), and the feature builder pulls from all of them and merges into a single feature row at build time.
+
+Intraday — 5 separate parquet sources, merged row-by-row in features.py:
+
+Load bars (data/bars/<SYM>/<YYYY-MM>.parquet)      → 20 PRICE_FEATURES
+  ├─ read fo_<date>.parquet (20 days)              → oi_change_z, basis_pct
+  ├─ read eq_<date>.parquet (20 days)              → delivery_z
+  ├─ read preopen/<date>.parquet (PIT <09:30)      → preopen_imbalance
+  └─ read fii_dii.parquet                          → fii_5d_z
+        → merged via `**flow` dict-unpack into ONE 31-column row
+Daily — one partial pre-merge, then ~14 separate sources combined lazily:
+
+One pre-merge step: panel.py:122 LEFT-JOINs eq_* + fo_* per symbol → data/daily/<SYM>.parquet (this is the only place files are physically combined).
+Everything else stays separate and is combined in-memory per decision day via row.update(...) in features.py:334-346:
+9 separate global files — spx.parquet, ndx.parquet, dxy.parquet, crude.parquet, gold.parquet, us10y.parquet, usdinr.parquet, asia.parquet, india_vix.parquet — each read independently by date, never joined to each other.
+3 separate macro CSVs — macro_calendar.csv, events.csv, monsoon.csv.
+1 FII file (fii_dii.parquet) + 1 sentiment file (scored.parquet).
+Key architectural facts:
+
+One file per source type, deliberately. This is why the _present flag exists: if a source file is absent (e.g. global data not yet ingested), that block imputes to 0 and flags _present=0 rather than failing — so sources are decoupled and independently optional.
+Point-in-time enforced at merge: every non-bar source is filtered release_ts <= decision_ts (or strictly prior day) before it joins the row — no lookahead.
+Intraday splits by channel into two models: PRICE_FEATURES → LightGBM, FLOW_FEATURES → CatBoost (deliberate decorrelation). Daily uses a single combined 61-feature row into one LightGBM.
+Bottom line: the design is intentionally modular per source (separate files, independently ingested, independently optional), with combination happening at feature-build time — not a single monolithic input file. The trade-off is that several high-value categories (option-chain/PCR, real order-flow features, live news, real index/sector context) are either omitted or scaffolded-but-unwired, which is consistent with the project's measured finding that market+F&O alone showed no edge.
+
+Want me to (a) produce a written gap-closure plan for the missing categories (PCR, MACD/trend, L2 featurization, news wiring), or (b) map exactly which of these gaps the daily plan intends to fill in its next phases?
