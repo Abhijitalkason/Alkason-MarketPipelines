@@ -99,6 +99,7 @@ class PaperRunner:
     # ── live evaluation at each 15-min close ──────────────────────────
 
     def evaluate(self) -> None:
+        regime_active = bool(self.cfg.get("regime", {}).get("active", False))
         for _, s in self.screened.iterrows():
             sym = s["symbol"]
             if sym in self.positions:
@@ -117,6 +118,24 @@ class PaperRunner:
             p_p = self.price_model.predict_proba(row)
             p_f = self.flow_model.predict_proba(row) if self.flow_model is not None else None
             p_cal = self.blender.calibrated(p_p, p_f)
+            # PLAN_v4 §7 — per-candidate direction veto immediately before the gate.
+            # Evaluated AFTER features/probabilities so the journal line carries the
+            # full counterfactual scaffold: once the day's bars mature, this exact
+            # row can be labeled and the vetoed signal scored (would it have won?).
+            if regime_active:
+                from src.intraday.regime import veto
+                vetoed, vreason = veto(self.day, int(s["direction"]))
+                if vetoed:
+                    journal_write("gate_eval", {
+                        "symbol": sym, "direction": int(s["direction"]),
+                        "p_price": float(p_p[0]),
+                        "p_flow": float(p_f[0]) if p_f is not None else None,
+                        "p_cal": float(p_cal[0]), "tau": self.gate.state.tau,
+                        "fired": False, "skipped": vreason,
+                        "features": row.drop(columns=["symbol", "ts", "date"],
+                                             errors="ignore").iloc[0].to_dict(),
+                    }, day=self.day)
+                    continue
             fired = bool(self.gate.fire(p_cal, p_p, p_f)[0])
             journal_write("gate_eval", {
                 "symbol": sym, "p_price": float(p_p[0]),
@@ -243,6 +262,19 @@ class PaperRunner:
             logger.info("%s is a blackout day — recorder runs, no signals", self.day)
             self.recorder.run_session()
             return
+        # PLAN_v4 §7 — day-level regime no-trade (hostile morning). Sits beside the
+        # blackout check but is NOT is_blackout: the recorder still runs and the day
+        # remains a labeled candidate day; we simply emit no signals.
+        if bool(self.cfg.get("regime", {}).get("active", False)):
+            from src.intraday.regime import day_regime
+            rv = day_regime(self.day)
+            if rv.no_trade:
+                logger.info("%s regime no-trade (score=%.2f) — recorder runs, no signals",
+                            self.day, rv.risk_score)
+                journal_write("regime_no_trade", {"risk_score": rv.risk_score,
+                                                  "bias": rv.bias}, day=self.day)
+                self.recorder.run_session()
+                return
 
         self.recorder.capture_preopen()
         # poll through the pre-screen window so today's first 15-min bar exists live

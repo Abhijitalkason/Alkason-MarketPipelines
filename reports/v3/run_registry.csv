@@ -1,0 +1,2 @@
+ts,stamp,git_sha,config_hash,stress,args,win_rate,expectancy,coverage,all_pass
+2026-07-03T10:08:09,20260703_100809,cc07a1d94605175cf78a95292f12ca1a38dc2c7d,1ab5287aed17,False,v4-MECHANISM-CHECK gate-open,0.5102040816326531,-0.0026661145729000315,0.013808651542905453,False

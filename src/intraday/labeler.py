@@ -68,18 +68,23 @@ def label_day(symbol: str, day: date, directions: dict[pd.Timestamp, int] | None
     """
     cfg = load_config()
     geo = geometry or cfg["geometry"]
+
+    def _geo(key):
+        # honor the geometry_study override dict for EVERY tuned key, config
+        # fallback otherwise (PLAN_v4 §2 — the override was silently ignored for
+        # squareoff/time_barrier/atr_window, breaking any grid that swept them).
+        return geo[key] if key in geo else cfg["geometry"][key]
+
     if df_1min is None:
         # ATR needs ~5 prior sessions of bars
         df_1min = load_1min(symbol, day - timedelta(days=10), day)
     df5 = resample(df_1min, cfg["data"]["bar_freq_feature"])
-    atr = atr_2h(df5)
+    atr = atr_2h(df5, window_minutes=_geo("atr_window_minutes"))
 
-    w_start = time.fromisoformat(geo["entry_window"][0] if "entry_window" in geo
-                                 else cfg["geometry"]["entry_window"][0])
-    w_end = time.fromisoformat(geo["entry_window"][1] if "entry_window" in geo
-                               else cfg["geometry"]["entry_window"][1])
-    squareoff = time.fromisoformat(cfg["geometry"]["squareoff"])
-    t_barrier_h = cfg["geometry"]["time_barrier_hours"]
+    w_start = time.fromisoformat(_geo("entry_window")[0])
+    w_end = time.fromisoformat(_geo("entry_window")[1])
+    squareoff = time.fromisoformat(_geo("squareoff"))
+    t_barrier_h = _geo("time_barrier_hours")
     df15 = resample(df_1min[df_1min.index.date == day], cfg["data"]["bar_freq_decision"])
 
     outcomes: list[TradeOutcome] = []

@@ -91,15 +91,24 @@ def _dead_control_sweep() -> list[str]:
 
 # ── Gate 1 — data ─────────────────────────────────────────────────────
 
-def gate1(min_names: int = 180, min_years: float = 3.0) -> GateResult:
+def gate1(min_names: int | None = None, min_years: float = 3.0) -> GateResult:
     """≥3y bars for the PIT universe, bar-vs-bhavcopy mismatch <0.1%, recorder
-    uptime, reconcile skew <5 bps. Reads what's on disk; raises nothing."""
+    uptime, reconcile skew <5 bps. Reads what's on disk; raises nothing.
+
+    PLAN_v4 §3 / M0: the pass threshold is config-driven relative to the actual
+    PIT universe (gates.min_data_names_frac) rather than the hardcoded 180 that
+    was structurally unreachable on a ~50-name universe."""
     from datetime import timedelta
     from src.intraday import load_universe, today_ist
     from src.intraday.bars import session_dates
 
     detail: dict = {"names_ok": 0, "mismatches": [], "reconcile_alerts": []}
     uni = load_universe(as_of=today_ist())["symbol"].tolist()
+    if min_names is None:
+        frac = load_config()["gates"].get("min_data_names_frac", 0.90)
+        min_names = int(len(uni) * frac)
+    detail["universe_size"] = len(uni)
+    detail["min_names"] = min_names
     cutoff = today_ist() - timedelta(days=int(min_years * 365.25))
     for sym in uni:
         try:
@@ -119,7 +128,8 @@ def gate1(min_names: int = 180, min_years: float = 3.0) -> GateResult:
 # ── Gate 2 — label/geometry ───────────────────────────────────────────
 
 def gate2(train_days: list | None = None) -> GateResult:
-    """A geometry exists with baseline ≥86% and required δ ≤ 4 pts."""
+    """A geometry exists in [min_baseline, max_baseline] with required δ ≤
+    max_required_delta_pts (PLAN_v4 §4 — thresholds are config-driven)."""
     from src.intraday.geometry_study import TrainWindow, choose_geometry, run_grid
 
     if train_days is None:
@@ -135,7 +145,7 @@ def gate2(train_days: list | None = None) -> GateResult:
     chosen = choose_geometry(grid)
     passed = chosen is not None
     return _write(GateResult("gate2", passed, {"chosen_geometry": chosen,
-                             "qualifying_cells": int(grid["meets_baseline_86"].sum())}))
+                             "qualifying_cells": int(grid["meets_geometry"].sum())}))
 
 
 # ── Gate 3 — backtest (base + 2× stress) ──────────────────────────────

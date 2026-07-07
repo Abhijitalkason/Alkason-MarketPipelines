@@ -29,8 +29,13 @@ from src.intraday.screener import screen_day
 
 logger = logging.getLogger(__name__)
 
-A_GRID = [0.25, 0.30, 0.40, 0.50, 0.60]
-B_GRID = [1.5, 2.0, 2.4, 3.2, 4.0]
+# PLAN_v4 §4 — retargeted grid. Selection favors WIDE total width at the ~0.80
+# floor because required edge δ = c/W falls as width grows; shrinking b to reach
+# 0.80 would RAISE δ (the corrected geometry math). Secondary axes
+# (time_barrier_hours, atr_window_minutes) are taken from config and honored by
+# the labeler override — sweep them by editing config and re-running.
+A_GRID = [0.40, 0.50, 0.60, 0.75, 1.00]
+B_GRID = [2.0, 2.5, 3.0, 3.5, 4.0]
 
 
 class TrainWindow:
@@ -72,6 +77,10 @@ def run_grid(train: TrainWindow) -> pd.DataFrame:
     if not isinstance(train, TrainWindow):
         raise TypeError("run_grid requires a TrainWindow (train days only) — refuse test data")
     cfg = load_config()
+    gs = cfg.get("geometry_study", {})
+    min_baseline = float(gs.get("min_baseline", 0.76))
+    max_baseline = float(gs.get("max_baseline", 0.84))
+    max_delta = float(gs.get("max_required_delta_pts", 3.0))
     # representative cost: a typical large-cap notional / median volume
     results = []
     for a in A_GRID:
@@ -86,15 +95,19 @@ def run_grid(train: TrainWindow) -> pd.DataFrame:
             width_pct = W * mean_atr_pct
             c = _representative_cost()
             required_delta = c / width_pct if width_pct > 0 else np.nan
+            required_delta_pts = required_delta * 100
+            in_band = min_baseline <= baseline <= max_baseline
+            delta_ok = required_delta_pts <= max_delta
             results.append({
                 "a": a, "b": b, "width_atr": W, "width_pct": width_pct,
                 "baseline_win_rate": baseline,
                 "geometric_floor": b / (a + b),
-                "required_delta_pts": required_delta * 100,
+                "required_delta_pts": required_delta_pts,
                 "n_candidates": len(df),
                 "projected_coverage_hint": baseline,  # finer coverage comes from the gate
-                "meets_baseline_86": baseline >= 0.86,
-                "meets_delta_4pts": required_delta * 100 <= 4.0,
+                "meets_baseline_band": in_band,
+                "meets_delta": delta_ok,
+                "meets_geometry": in_band and delta_ok,
             })
     grid = pd.DataFrame(results)
     out_dir = ROOT / cfg["paths"]["reports"]
@@ -124,10 +137,12 @@ def _representative_cost() -> float:
 
 
 def choose_geometry(grid: pd.DataFrame) -> dict | None:
-    """Pick the geometry meeting both constraints with the widest barrier
-    (lowest required edge). Returns {target_atr, stop_atr} or None if none qualify
-    — the honest Gate-2 fail (PLAN_v3 §19)."""
-    ok = grid[grid["meets_baseline_86"] & grid["meets_delta_4pts"]]
+    """Pick the qualifying geometry with the lowest required edge (widest usable
+    barrier). Returns {target_atr, stop_atr} or None if none qualify — the honest
+    Gate-2 fail (PLAN_v4 §4)."""
+    if grid.empty or "meets_geometry" not in grid.columns:
+        return None
+    ok = grid[grid["meets_geometry"]]
     if ok.empty:
         return None
     best = ok.sort_values("required_delta_pts").iloc[0]

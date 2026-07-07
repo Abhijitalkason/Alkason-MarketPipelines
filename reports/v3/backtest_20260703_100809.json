@@ -1,0 +1,226 @@
+{
+  "generated": "2026-07-03T10:08:09",
+  "window": {
+    "start": "2025-06-02",
+    "end": "2026-06-19"
+  },
+  "stress_slippage": false,
+  "geometric_baseline": 0.8,
+  "n_trades": 98,
+  "win_rate": 0.5102040816326531,
+  "edge_over_baseline": -0.28979591836734697,
+  "expectancy_pct_net": -0.0026661145729000315,
+  "signals_per_day": 6.533333333333333,
+  "coverage_of_candidates": 0.013808651542905453,
+  "profit_factor": 0.32945186565467666,
+  "max_drawdown": -0.19027833208061462,
+  "worst_day_pct": -0.05425195896201532,
+  "sharpe_daily": -13.069170063317143,
+  "brier_score": 0.25335318271331464,
+  "calibration_gap": 0.01638733114072133,
+  "winrate_ci_dayclustered": {
+    "low": 0.39783912324234905,
+    "high": 0.6261705843481544
+  },
+  "fold_stats": [
+    {
+      "fold": 1,
+      "n_trades": 42,
+      "win_rate": 0.5238095238095238,
+      "expectancy_pct": -0.003515000876089406,
+      "signals_per_day": 0.8936170212765957,
+      "coverage": 0.012526096033402923,
+      "calib_brier": 0.248884751253332
+    },
+    {
+      "fold": 2,
+      "n_trades": 2,
+      "win_rate": 0.0,
+      "expectancy_pct": -0.00921220902306066,
+      "signals_per_day": 0.04878048780487805,
+      "coverage": 0.0006775067750677507,
+      "calib_brier": 0.24999096898931122
+    },
+    {
+      "fold": 3,
+      "n_trades": 54,
+      "win_rate": 0.5185185185185185,
+      "expectancy_pct": -0.0017634217278208635,
+      "signals_per_day": 4.909090909090909,
+      "coverage": 0.06818181818181818,
+      "calib_brier": 0.24971049244529733
+    }
+  ],
+  "fairness": {
+    "symbol": {
+      "AXISBANK": {
+        "n": 11,
+        "win_rate": 0.36363636363636365,
+        "expectancy": -0.003610342409427299,
+        "mean_p_cal": 0.5422501326410571
+      },
+      "BAJFINANCE": {
+        "n": 10,
+        "win_rate": 0.7,
+        "expectancy": 0.00019179879972264138,
+        "mean_p_cal": 0.5327054186238867
+      },
+      "BHARTIARTL": {
+        "n": 8,
+        "win_rate": 0.5,
+        "expectancy": -0.002477385706714035,
+        "mean_p_cal": 0.5109975727455408
+      },
+      "BPCL": {
+        "n": 6,
+        "win_rate": 0.5,
+        "expectancy": -0.004853740927478855,
+        "mean_p_cal": 0.5102501385309184
+      },
+      "HDFCBANK": {
+        "n": 6,
+        "win_rate": 0.3333333333333333,
+        "expectancy": -0.0060264735986898105,
+        "mean_p_cal": 0.5347745098382491
+      },
+      "ICICIBANK": {
+        "n": 5,
+        "win_rate": 0.0,
+        "expectancy": -0.004165354033903336,
+        "mean_p_cal": 0.5708936814718102
+      },
+      "INFY": {
+        "n": 8,
+        "win_rate": 0.75,
+        "expectancy": 0.0011200010024143032,
+        "mean_p_cal": 0.5116381858698865
+      },
+      "ITC": {
+        "n": 4,
+        "win_rate": 0.0,
+        "expectancy": -0.008712355268990607,
+        "mean_p_cal": 0.5124390306296472
+      },
+      "KOTAKBANK": {
+        "n": 8,
+        "win_rate": 0.625,
+        "expectancy": -0.002287043390664101,
+        "mean_p_cal": 0.5112377634900062
+      },
+      "RELIANCE": {
+        "n": 9,
+        "win_rate": 0.6666666666666666,
+        "expectancy": -0.0011836603360191867,
+        "mean_p_cal": 0.5114602203677174
+      },
+      "SBIN": {
+        "n": 10,
+        "win_rate": 0.5,
+        "expectancy": -0.0031214024210937373,
+        "mean_p_cal": 0.5119585237737908
+      },
+      "TCS": {
+        "n": 5,
+        "win_rate": 0.8,
+        "expectancy": 0.0017676379083678441,
+        "mean_p_cal": 0.6105919003115263
+      },
+      "WIPRO": {
+        "n": 8,
+        "win_rate": 0.5,
+        "expectancy": -0.005042721097782069,
+        "mean_p_cal": 0.5116381858698865
+      }
+    },
+    "sector": {
+      "Banking": {
+        "n": 40,
+        "win_rate": 0.4,
+        "expectancy": -0.0036552437400401505,
+        "mean_p_cal": 0.5309338567774533
+      },
+      "Energy": {
+        "n": 15,
+        "win_rate": 0.6,
+        "expectancy": -0.0026516925726030537,
+        "mean_p_cal": 0.5109761876329979
+      },
+      "FMCG": {
+        "n": 4,
+        "win_rate": 0.0,
+        "expectancy": -0.008712355268990607,
+        "mean_p_cal": 0.5124390306296472
+      },
+      "IT": {
+        "n": 21,
+        "win_rate": 0.6666666666666666,
+        "expectancy": -0.0010735033914810906,
+        "mean_p_cal": 0.535198594070277
+      },
+      "NBFC": {
+        "n": 10,
+        "win_rate": 0.7,
+        "expectancy": 0.00019179879972264138,
+        "mean_p_cal": 0.5327054186238867
+      },
+      "Telecom": {
+        "n": 8,
+        "win_rate": 0.5,
+        "expectancy": -0.002477385706714035,
+        "mean_p_cal": 0.5109975727455408
+      }
+    },
+    "vol_regime": {
+      "low": {
+        "n": 33,
+        "win_rate": 0.5454545454545454,
+        "expectancy": -0.003395514148763321,
+        "mean_p_cal": 0.5102306405345496
+      },
+      "mid": {
+        "n": 32,
+        "win_rate": 0.40625,
+        "expectancy": -0.003219891104298528,
+        "mean_p_cal": 0.5257854985740906
+      },
+      "high": {
+        "n": 33,
+        "win_rate": 0.5757575757575758,
+        "expectancy": -0.0013997195726503187,
+        "mean_p_cal": 0.5437336775690808
+      }
+    },
+    "tod_bucket": {
+      "0930-1000": {
+        "n": 71,
+        "win_rate": 0.4788732394366197,
+        "expectancy": -0.00272084127471845,
+        "mean_p_cal": 0.5294685483436677
+      },
+      "1000-1030": {
+        "n": 19,
+        "win_rate": 0.631578947368421,
+        "expectancy": -0.0025900981304519664,
+        "mean_p_cal": 0.5217989091764794
+      },
+      "1030-1100": {
+        "n": 8,
+        "win_rate": 0.5,
+        "expectancy": -0.0023609541450757094,
+        "mean_p_cal": 0.5124390306296472
+      }
+    }
+  },
+  "per_symbol_coverage": {},
+  "excluded_symbols": [],
+  "gates": {
+    "win_rate_ok": false,
+    "expectancy_ok": false,
+    "signals_ok": true,
+    "calibration_ok": true,
+    "no_subsidy_ok": false,
+    "per_symbol_coverage_ok": true,
+    "ci_above_floor_ok": false,
+    "all_pass": false
+  }
+}

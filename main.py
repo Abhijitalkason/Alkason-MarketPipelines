@@ -86,8 +86,36 @@ def cmd_backtest(args):
     end = date.fromisoformat(args.end) if args.end else _today()
     start = date.fromisoformat(args.start) if args.start else end - timedelta(days=3 * 365)
     report = run_backtest(start, end, stress=args.stress, tune=args.tune,
-                          args_note=f"cli start={start} end={end} stress={args.stress}")
+                          symbols=args.symbols,   # PLAN_v4 §6.3 Run D: restrict universe
+                          args_note=f"cli start={start} end={end} stress={args.stress} "
+                                    f"symbols={args.symbols}")
     print(json.dumps(report["gates"], indent=2, default=str))
+
+
+# ── PLAN_v4: pre-open regime + news channels ──────────────────────────
+
+def cmd_regime_capture(args):
+    from src.intraday.regime_data import capture_today
+    day = date.fromisoformat(args.date) if args.date else _today()
+    n = capture_today(day)
+    print(json.dumps({"mode": "regime-capture", "day": str(day), "rows": n}))
+
+
+def cmd_regime_backfill(args):
+    from src.intraday import load_config
+    from src.intraday.regime_data import backfill
+    end = date.fromisoformat(args.end) if args.end else _today()
+    years = args.years or load_config()["data"]["backfill_years"]
+    start = date.fromisoformat(args.start) if args.start else end - timedelta(days=int(years * 365.25))
+    n = backfill(start, end)
+    print(json.dumps({"mode": "regime-backfill", "start": str(start), "end": str(end), "rows": n}))
+
+
+def cmd_news_capture(args):
+    from src.intraday.news_regime import capture
+    day = date.fromisoformat(args.date) if args.date else _today()
+    n = capture(day)
+    print(json.dumps({"mode": "news-capture", "day": str(day), "headlines": n}))
 
 
 def cmd_train_v3(args):
@@ -143,6 +171,7 @@ def main():
         "backfill", "bhavcopy", "corp-actions", "record", "screen", "geometry-study",
         "backtest", "train-v3", "promote", "rollback", "recalibrate", "paper",
         "drift", "gates", "serve",
+        "regime-capture", "regime-backfill", "news-capture",   # PLAN_v4 §5/§8
     ])
     p.add_argument("--symbols", nargs="+", default=None)
     p.add_argument("--years", type=int, default=None)
@@ -166,6 +195,8 @@ def main():
         "backtest": cmd_backtest, "train-v3": cmd_train_v3, "promote": cmd_promote,
         "rollback": cmd_rollback, "recalibrate": cmd_recalibrate, "paper": cmd_paper,
         "drift": cmd_drift, "gates": cmd_gates, "serve": cmd_serve,
+        "regime-capture": cmd_regime_capture, "regime-backfill": cmd_regime_backfill,
+        "news-capture": cmd_news_capture,
     }
     dispatch[args.mode](args)
 

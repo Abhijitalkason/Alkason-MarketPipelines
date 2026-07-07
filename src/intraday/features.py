@@ -44,8 +44,21 @@ FLOW_FEATURES = [
     "oi_change_z", "basis_pct", "delivery_z", "preopen_imbalance", "fii_5d_z",
 ]
 FLOW_PRESENT = [f + "_present" for f in FLOW_FEATURES]
-FEATURE_ORDER = PRICE_FEATURES + FLOW_FEATURES + FLOW_PRESENT + ["direction"]
-SCHEMA_VERSION = "v3.1"
+
+# PLAN_v4 §6.1 — pre-open regime channel (schema v4.0). Global/macro features are
+# backfillable and enter the decision backtest; news_* features are forward-only
+# and historically present=0 (the honest staging). All route into the price model;
+# _present flags keep imputation from masquerading as data (same contract as flow).
+REGIME_FEATURES = [
+    "spx_ret_1d", "ndx_ret_1d", "asia_ret_1d", "usdinr_ret_1d", "crude_ret_1d",
+    "india_vix_prev", "india_vix_chg_5d", "gift_gap_pct",
+    "news_sent_market", "news_sent_sector", "news_sent_stock", "news_count_stock",
+    "regime_dir_agree",
+]
+REGIME_PRESENT = [f + "_present" for f in REGIME_FEATURES]
+FEATURE_ORDER = (PRICE_FEATURES + FLOW_FEATURES + FLOW_PRESENT
+                 + REGIME_FEATURES + REGIME_PRESENT + ["direction"])
+SCHEMA_VERSION = "v4.0"
 
 
 class FeatureSchemaError(ValueError):
@@ -175,6 +188,82 @@ def _flow_row(symbol: str, day: date) -> dict:
     return out
 
 
+# Market-level regime values are constant across every symbol screened on a day
+# (~12 symbols would otherwise re-read the same parquets 12×, PLAN_v4 §6.1).
+# Keyed by (resolved regime dir, day) so tests with monkeypatched roots can never
+# poison each other; bounded so a multi-year build can't grow it unchecked.
+_REGIME_DAY_CACHE: dict[tuple, tuple[dict, object]] = {}
+_REGIME_DAY_CACHE_MAX = 512
+
+
+def _market_regime_for_day(day: date, decision_ts) -> tuple[dict, object]:
+    """(regime_features dict, day_regime verdict-or-None) for `day`, cached."""
+    from src.intraday import data_path
+    from src.intraday.regime_data import regime_features
+
+    key = (str(data_path("regime_path")), day, decision_ts)
+    if key in _REGIME_DAY_CACHE:
+        return _REGIME_DAY_CACHE[key]
+    feats: dict = {}
+    verdict = None
+    try:
+        feats = regime_features(day, decision_ts)
+    except Exception as e:  # noqa: BLE001 — regime is optional context, never fatal
+        logger.warning("regime features %s skipped (%s)", day, e)
+    try:
+        from src.intraday.regime import day_regime
+        verdict = day_regime(day, decision_ts)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("day_regime %s skipped (%s)", day, e)
+    if len(_REGIME_DAY_CACHE) >= _REGIME_DAY_CACHE_MAX:
+        _REGIME_DAY_CACHE.clear()
+    _REGIME_DAY_CACHE[key] = (feats, verdict)
+    return feats, verdict
+
+
+def _regime_row(symbol: str, sector: str, day: date, direction: int,
+                decision_ts: pd.Timestamp | None = None) -> dict:
+    """Pre-open regime features for (symbol, day), each with a _present flag
+    (PLAN_v4 §6.1). Combines the backfillable global/macro channel (regime_data)
+    with the forward-only news channel (news_regime), plus regime_dir_agree =
+    candidate direction × regime bias. Market-level values are cached PER DAY
+    (constant across symbols); only the news lookup is per-symbol.
+
+    Fully fail-open: absent data → NaN + present=0, imputed in build_matrix."""
+    from src.intraday.news_regime import news_features
+
+    out: dict[str, float] = {}
+    for k in REGIME_FEATURES:
+        out[k] = np.nan
+        out[k + "_present"] = 0.0
+    market_feats, verdict = _market_regime_for_day(day, decision_ts)
+    out.update(market_feats)
+    try:
+        out.update(news_features(symbol, sector, day, decision_ts))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("news features %s %s skipped (%s)", symbol, day, e)
+
+    # regime_dir_agree: does the candidate lean with the pre-open regime? Uses the
+    # same composite the veto uses, so feature and veto share one definition.
+    if verdict is not None and getattr(verdict, "present", False):
+        out["regime_dir_agree"] = float(direction * verdict.bias)
+        out["regime_dir_agree_present"] = 1.0
+    # keep only the canonical keys (regime_features/news_features return exactly
+    # their own subsets; guard against any stray keys)
+    return {k: out.get(k, np.nan if not k.endswith("_present") else 0.0)
+            for k in (REGIME_FEATURES + REGIME_PRESENT)}
+
+
+def _sector_of(symbol: str, day: date) -> str:
+    from src.intraday import load_universe
+    try:
+        uni = load_universe(as_of=day)
+        row = uni[uni.symbol == symbol]
+        return str(row["sector"].iloc[0]) if not row.empty else "UNKNOWN"
+    except Exception:  # noqa: BLE001
+        return "UNKNOWN"
+
+
 def features_for_day(symbol: str, day: date, direction: int = 1,
                      df_1min: pd.DataFrame | None = None) -> pd.DataFrame:
     """Feature rows for every decision bar of one symbol-day (entry window only).
@@ -215,6 +304,7 @@ def features_for_day(symbol: str, day: date, direction: int = 1,
     gap = (open_px - prev_close) / prev_close
 
     flow = _flow_row(symbol, day)
+    regime = _regime_row(symbol, _sector_of(symbol, day), day, direction)
     w_start = time.fromisoformat(geo["entry_window"][0])
     w_end = time.fromisoformat(geo["entry_window"][1])
 
@@ -280,6 +370,7 @@ def features_for_day(symbol: str, day: date, direction: int = 1,
             "atr_pct": a / c,
             "direction": float(direction),
             **flow,
+            **regime,
         })
     df = pd.DataFrame(rows)
     if df.empty:
@@ -289,10 +380,14 @@ def features_for_day(symbol: str, day: date, direction: int = 1,
 
 
 def impute_flow(df: pd.DataFrame) -> pd.DataFrame:
-    """flow NaN → 0.0 ONLY alongside its _present flag (already 0 for imputed
-    values) — information preserved (B-5). Returns a copy."""
+    """flow + regime NaN → 0.0 ONLY alongside their _present flags (already 0 for
+    imputed values) — information preserved (B-5, extended to the regime channel
+    in PLAN_v4 §6.1). Returns a copy."""
     out = df.copy()
     out[FLOW_FEATURES] = out[FLOW_FEATURES].fillna(0.0)
+    present_regime = [c for c in REGIME_FEATURES if c in out.columns]
+    if present_regime:
+        out[present_regime] = out[present_regime].fillna(0.0)
     return out
 
 
@@ -301,6 +396,16 @@ def flow_real_share(df: pd.DataFrame) -> float:
     if df.empty:
         return 0.0
     return float(df[FLOW_PRESENT].mean(axis=1).mean())
+
+
+def regime_real_share(df: pd.DataFrame) -> float:
+    """Real-data share of the regime channel — logged each build so the news
+    channel's forward-only accrual is visible (PLAN_v4 §6.1). Global/macro
+    features lift this on backfilled days; news features stay 0 historically."""
+    cols = [c for c in REGIME_PRESENT if c in df.columns]
+    if df.empty or not cols:
+        return 0.0
+    return float(df[cols].mean(axis=1).mean())
 
 
 def build_matrix(plan: pd.DataFrame, require_flow: bool | None = None) -> pd.DataFrame:
@@ -352,7 +457,8 @@ def build_matrix(plan: pd.DataFrame, require_flow: bool | None = None) -> pd.Dat
         logger.info("features: dropped %d/%d rows with missing price features", dropped, n0)
 
     share = flow_real_share(out)
-    logger.info("features: flow_real_share=%.3f over %d rows", share, len(out))
+    logger.info("features: flow_real_share=%.3f regime_real_share=%.3f over %d rows",
+                share, regime_real_share(out), len(out))
     floor = 1.0 - cfg["data"]["max_flow_missing_share"]
     if require_flow and share < floor:
         raise FlowDataError(

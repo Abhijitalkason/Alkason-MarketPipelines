@@ -1,6 +1,31 @@
-# RUNBOOK — Intraday Selective Signal System (v3)
+# RUNBOOK — Intraday Selective Signal System (v4)
 
 Daily operations for the NSE intraday selective-signal system. All times IST.
+v4 additions: the pre-open regime/news captures below (PLAN_v4 §5/§8).
+
+## Pre-open regime & news capture (daily, 08:00–09:10)
+
+The regime channel's forward-only features (same-morning Asia snapshot, GIFT gap,
+news sentiment) only exist on days the capture ran — schedule it, don't rely on
+memory. One helper runs everything:
+
+```bash
+scripts/preopen_capture.sh          # regime-capture + news-capture, logged
+```
+
+Crontab (`crontab -e`, host in IST; adjust the path):
+
+```cron
+# pre-open news sweep (overnight headlines) + regime snapshot
+0  8 * * 1-5  cd /path/to/AI-MLOps-Solution && ./scripts/preopen_capture.sh >> reports/v3/capture_cron.log 2>&1
+# second pull just before the screen window (late headlines + fresh Asia levels)
+10 9 * * 1-5  cd /path/to/AI-MLOps-Solution && ./scripts/preopen_capture.sh >> reports/v3/capture_cron.log 2>&1
+```
+
+News scoring needs `pip install feedparser transformers torch` (FinBERT downloads
+on first use). Without them the capture degrades to a clean no-op — features stay
+`present=0`, which the missingness policy handles by design. Backfill of the
+global/macro channel (one-time / after gaps): `python main.py --mode regime-backfill`.
 
 ## Daily token refresh (before 08:55)
 1. The Upstox access token expires daily. Complete the OAuth login at

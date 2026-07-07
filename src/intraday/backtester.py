@@ -250,12 +250,16 @@ def trading_sessions(start: date, end: date) -> list[date]:
 
 def run_backtest(start: date, end: date, stress: bool = False,
                  capital_per_trade_inr: float = 100_000, tune: bool | None = None,
-                 args_note: str = "") -> dict:
+                 args_note: str = "", symbols: list[str] | None = None) -> dict:
+    """PLAN_v4 §6.3: `symbols` restricts the universe (Run D — the user's fixed
+    16-name list) to quantify the coverage/WR cost vs the full screened universe.
+    None ⇒ the PIT universe, as before (Runs A/B/C)."""
     cfg = load_config()
+    regime_active = bool(cfg.get("regime", {}).get("active", False))
     all_days = trading_sessions(start, end)
 
     logger.info("assembling dataset %s → %s (%d trading days)", start, end, len(all_days))
-    data = build_dataset(all_days)
+    data = build_dataset(all_days, symbols=symbols)
     data["date"] = pd.to_datetime(data["date"]).dt.date
     folds = make_folds(sorted(data["date"].unique()))
     logger.info("walk-forward: %d folds, geometric baseline %.3f", len(folds), geometric_baseline())
@@ -280,8 +284,18 @@ def run_backtest(start: date, end: date, stress: bool = False,
             p_f = fm.predict_proba(day_rows) if fm is not None else None
             p_cal = blender.calibrated(p_p, p_f)
             mask = gate.fire(p_cal, p_p, p_f)
+            # PLAN_v4 §7 — fire-time regime veto (NOT is_blackout): vetoed rows
+            # drop from the fired set but the day stays in the coverage denominator.
+            day_score = 0.0
+            if regime_active:
+                from src.intraday.regime import day_regime, veto
+                day_score = day_regime(day).risk_score
+                vkeep = ~day_rows["direction"].apply(
+                    lambda d: veto(day, int(d))[0]).to_numpy()
+                mask = mask & vkeep
             fired = day_rows[mask].copy()
             fired["p_cal"] = p_cal[mask]
+            fired["regime_score"] = day_score
             fired = fired.sort_values("entry_ts").groupby("symbol", as_index=False).first()
             day_labels = []
             for _, r in fired.iterrows():
@@ -300,6 +314,7 @@ def run_backtest(start: date, end: date, stress: bool = False,
                     "label": int(r["label"]), "barrier": r["barrier"],
                     "atr_pct": float(r["atr_pct"]),
                     "tod_bucket": _tod_bucket(r["entry_ts"]),
+                    "regime_score": float(r.get("regime_score", 0.0)),
                     "pnl_pct_gross": r["pnl_pct"], "cost_pct": cost,
                     "pnl_pct_net": r["pnl_pct"] - cost,
                 })
@@ -393,6 +408,11 @@ def _finalize(trades, fold_stats, data, stress, start, end, args_note, all_test_
     calib_gap = _calibration_gap(tdf)
     excluded = [s for s, r in cov_report.items() if r["below_target"]]
     subsidy = _subsidy_breaches(fairness)
+    # PLAN_v4 §6.3/§1.2 — day-CLUSTERED CI of the fired win rate vs the geometric
+    # floor. Regime features are constant per day and trades within a day are
+    # correlated, so a trade-iid CI overstates confidence; bootstrap over days.
+    ci_low, ci_high = _daycluster_winrate_ci(tdf)
+    ci_above_floor = ci_low > geometric_baseline()
 
     report = {
         "generated": datetime.now().isoformat(timespec="seconds"),
@@ -412,6 +432,7 @@ def _finalize(trades, fold_stats, data, stress, start, end, args_note, all_test_
         "sharpe_daily": sharpe,
         "brier_score": brier,
         "calibration_gap": calib_gap,
+        "winrate_ci_dayclustered": {"low": ci_low, "high": ci_high},
         "fold_stats": fold_stats,
         "fairness": fairness,
         "per_symbol_coverage": cov_report,
@@ -423,6 +444,7 @@ def _finalize(trades, fold_stats, data, stress, start, end, args_note, all_test_
             "calibration_ok": calib_gap <= g["calibration_max_gap"],
             "no_subsidy_ok": not subsidy,
             "per_symbol_coverage_ok": len(excluded) == 0,
+            "ci_above_floor_ok": ci_above_floor,
         },
     }
     report["gates"]["all_pass"] = all(report["gates"].values())
@@ -455,8 +477,18 @@ def _fairness_tables(tdf: pd.DataFrame) -> dict:
         tdf["vol_regime"] = pd.qcut(tdf["atr_pct"], 3, labels=["low", "mid", "high"], duplicates="drop")
     except ValueError:
         tdf["vol_regime"] = "all"
+    group_keys = ["symbol", "sector", "vol_regime", "tod_bucket"]
+    # PLAN_v4 §6.3 — per-regime fairness: tercile of the day's composite risk score
+    if "regime_score" in tdf.columns and tdf["regime_score"].nunique() > 1:
+        try:
+            tdf["regime_bucket"] = pd.qcut(tdf["regime_score"], 3,
+                                           labels=["risk_off", "neutral", "risk_on"],
+                                           duplicates="drop")
+            group_keys.append("regime_bucket")
+        except ValueError:
+            pass
     out = {}
-    for key in ["symbol", "sector", "vol_regime", "tod_bucket"]:
+    for key in group_keys:
         grp = tdf.groupby(key, observed=True)
         out[key] = {
             str(k): {"n": int(v), "win_rate": float(wr), "expectancy": float(ex),
@@ -483,6 +515,32 @@ def _calibration_gap(tdf: pd.DataFrame) -> float:
     if tdf.empty:
         return 1.0
     return float(abs(tdf["p_cal"].mean() - tdf["label"].mean()))
+
+
+def _daycluster_winrate_ci(tdf: pd.DataFrame, n_boot: int = 2000,
+                           seed: int = 42) -> tuple[float, float]:
+    """95% CI of the fired win rate, bootstrapped over DAYS not trades (PLAN_v4
+    §1.2 corr. 2). Resample trading days with replacement, pool their trades,
+    recompute the win rate. With <2 distinct days there is no cross-day variance
+    to estimate → return the point estimate for both bounds."""
+    if tdf.empty:
+        return 0.0, 0.0
+    days = sorted(tdf["date"].unique())
+    point = float(tdf["label"].mean())
+    if len(days) < 2:
+        return point, point
+    by_day = {d: tdf[tdf["date"] == d]["label"].to_numpy() for d in days}
+    rng = np.random.default_rng(seed)
+    idx = np.arange(len(days))
+    stats = []
+    for _ in range(n_boot):
+        pick = rng.choice(idx, size=len(days), replace=True)
+        labels = np.concatenate([by_day[days[i]] for i in pick])
+        if labels.size:
+            stats.append(labels.mean())
+    if not stats:
+        return point, point
+    return float(np.percentile(stats, 2.5)), float(np.percentile(stats, 97.5))
 
 
 def _excluded_symbols_file(excluded: list[str]) -> None:

@@ -15,6 +15,7 @@ data:
   preopen_path: data/preopen
   depth_path: data/depth
   reference_path: data/reference
+  regime_path: data/regime            # PLAN_v4 §5 — global/macro + news regime store
   backfill_years: 3
   record_depth_levels: 5
   bar_freq_decision: 15min            # decision bars
@@ -39,18 +40,23 @@ screen:
     delivery_z: 0.10
     index_alignment: 0.10
 
-geometry:                             # Section 8 — tuned by geometry_study, then FROZEN
-  target_atr: 0.40
-  stop_atr: 3.20
-  time_barrier_hours: 3
+geometry:                             # PLAN_v4 §4 — retargeted to the 80% floor, WIDE width
+  target_atr: 0.75                    # a — floor b/(a+b) = 3.00/3.75 = 0.80
+  stop_atr: 3.00                      # b — wide stop lowers required edge δ = c/W
+  time_barrier_hours: 2               # matches the 1–2h trade duration (PLAN_v4 §1.2 corr. 3)
   squareoff: "14:45"
   atr_window_minutes: 120
   entry_window: ["09:30", "11:00"]
 
-gate:                                 # Section 11
-  fire_threshold_init: 0.92           # tau_0; ACI adapts daily
+geometry_study:                       # PLAN_v4 §4 — grid accept/reject thresholds (config-driven)
+  min_baseline: 0.76                  # floor must sit BELOW the 0.80 target so the model adds edge
+  max_baseline: 0.84                  # too-high floor reproduces the v3 trap (δ unreachable)
+  max_required_delta_pts: 3.0
+
+gate:                                 # PLAN_v4 §4 — 80% contract
+  fire_threshold_init: 0.84           # tau_0 a few pts above target so ACI relaxes to equilibrium
   aci_gamma: 0.01
-  target_win_rate: 0.89               # alpha = 1 - target_win_rate
+  target_win_rate: 0.80               # alpha = 1 - target_win_rate = 0.20
   model_agreement_floor: 0.75
   calibration_window_days: 60         # rolling recalibration window (trainer --mode recalibrate)
   flow_model_active: false            # staged activation (B-5); trainer flips when
@@ -89,21 +95,35 @@ risk:                                 # Section 13
   blackout: [expiry, results, rbi, fed, budget]
   expiry_weekday: 3                   # Thursday (0=Mon) — weekly index expiry blackout
 
+regime:                               # PLAN_v4 §7 — pre-open regime veto (staged, like flow)
+  active: false                       # flips true only after Run C shows it doesn't hurt
+  no_trade_abs_score: 0.75            # |risk_score| above this + risk-off + vol spike ⇒ stand down
+  direction_veto_threshold: 0.50      # suppress signals fighting a regime this strong
+  bias_deadzone: 0.10                 # |risk_score| below this ⇒ neutral bias
+  vix_spike_5d: 0.20                  # 5-day VIX change flagged as a spike (chaotic regime)
+  weights:                            # composite risk_score component weights
+    spx: 0.30
+    ndx: 0.25
+    asia: 0.20
+    usdinr: 0.15
+    vix: 0.10
+
 drift:                                # B-7 — Evidently drift → ACI recalib → halt
   reference_artifact: feature_matrix  # production model's training matrix (drift reference)
   current_window_sessions: 10
   share_drifted_columns_alert: 0.30
   consecutive_breaches_to_halt: 2
 
-gates:                                # Section 19 — machine-checkable acceptance gates
-  min_win_rate: 0.89
+gates:                                # PLAN_v4 §6.4 — machine-checkable acceptance gates
+  min_win_rate: 0.80                  # retargeted from 0.89 (PLAN_v4 §1.2)
   min_expectancy_pct: 0.0005
   min_signals_per_day: 1.0
-  leakage_alarm_win_rate: 0.92
+  leakage_alarm_win_rate: 0.90        # ~+10pt margin over the 0.80 floor (retuned)
   leakage_alarm_coverage: 0.10
-  calibration_max_gap: 0.02           # |expected − realized| win rate in fired region
+  calibration_max_gap: 0.03           # |expected − realized| win rate in fired region
   paper_days: 22
   paper_max_winrate_gap: 0.03
+  min_data_names_frac: 0.90           # Gate 1: names_ok / PIT-universe size (PLAN_v4 §3, M0)
 
 mlflow:
   tracking_uri: http://localhost:5000

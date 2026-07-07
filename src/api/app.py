@@ -22,7 +22,8 @@ from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
 from src.intraday import ROOT, load_config, now_ist, today_ist
@@ -75,10 +76,27 @@ def _load_local_bundle():
     return pm, fm, blender
 
 
-app = FastAPI(title="Intraday Selective Signal API (v3)", version="3.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="Intraday Selective Signal API (v4)",
+    version="4.0.0",
+    description=(
+        "Selective NSE intraday signal API (PLAN_v4). Every endpoint requires the "
+        "`X-API-Key` header — click **Authorize** and paste the key (the value of "
+        "the env var named by `api.api_key_env`, default `V3_API_KEY`) to try the "
+        "endpoints from this page."
+    ),
+    lifespan=lifespan,
+    docs_url="/docs",          # Swagger UI (explicit)
+    redoc_url="/redoc",        # ReDoc (explicit)
+    openapi_url="/openapi.json",
+)
+
+# Declaring the scheme makes Swagger UI render an Authorize button that injects
+# X-API-Key on every "Try it out" call (auto_error=False so we return our own 401).
+_api_key_scheme = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-async def require_key(x_api_key: str = Header(default="")) -> None:
+async def require_key(x_api_key: str = Security(_api_key_scheme)) -> None:
     if x_api_key != _state.get("api_key"):
         raise HTTPException(401, detail="invalid or missing X-API-Key")
 

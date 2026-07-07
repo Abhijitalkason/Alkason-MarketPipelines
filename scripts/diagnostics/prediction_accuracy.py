@@ -1,5 +1,14 @@
 """Direct prediction-accuracy diagnostic (buy/sell skill), out-of-sample.
 
+RETIRED AS A DECISION METRIC (PLAN_v4 §9). Full-coverage accuracy at p≥0.5 over
+ALL OOF rows is NOT the system's contract — a selective signal system is designed
+to look near-random on the rows it would never trade, so ~0.50 here is EXPECTED,
+not failure (this exact number was the misread that motivated PLAN_v4). The
+contract metric is fired-signal win rate + post-cost expectancy from
+src/intraday/backtester.py (run `python main.py --mode backtest`). Kept for
+diagnosis only (AUC / rank skill / precision-at-top-k), under scripts/diagnostics/
+so it can never be mistaken for an acceptance gate.
+
 Reuses the cached dataset + the real walk-forward machinery, collects OOF
 calibrated predictions, and reports the metrics that actually measure
 prediction quality (not geometry-inflated win rate):
