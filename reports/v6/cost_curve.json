@@ -1,0 +1,69 @@
+{
+  "generated": "2026-07-08T11:05:59+05:30",
+  "broker": "Upstox",
+  "source": "upstox.com/brokerage-charges [VERIFIED 2026-07-08]",
+  "reference_size_inr": 100000,
+  "curve": [
+    {
+      "size_inr": 1000,
+      "cost_inr": 74.02,
+      "cost_pct": 7.4024,
+      "cost_pct_ex_slippage": 7.3024,
+      "cost_pct_2x_stress": 7.5024,
+      "flat_fee_share_pct": 95.6
+    },
+    {
+      "size_inr": 10000,
+      "cost_inr": 103.04,
+      "cost_pct": 1.0304,
+      "cost_pct_ex_slippage": 0.9304,
+      "cost_pct_2x_stress": 1.1304,
+      "flat_fee_share_pct": 68.7
+    },
+    {
+      "size_inr": 25000,
+      "cost_inr": 151.41,
+      "cost_pct": 0.6056,
+      "cost_pct_ex_slippage": 0.5056,
+      "cost_pct_2x_stress": 0.7056,
+      "flat_fee_share_pct": 46.8
+    },
+    {
+      "size_inr": 50000,
+      "cost_inr": 232.02,
+      "cost_pct": 0.464,
+      "cost_pct_ex_slippage": 0.364,
+      "cost_pct_2x_stress": 0.564,
+      "flat_fee_share_pct": 30.5
+    },
+    {
+      "size_inr": 100000,
+      "cost_inr": 393.25,
+      "cost_pct": 0.3932,
+      "cost_pct_ex_slippage": 0.2932,
+      "cost_pct_2x_stress": 0.4932,
+      "flat_fee_share_pct": 18.0
+    },
+    {
+      "size_inr": 1000000,
+      "cost_inr": 3295.25,
+      "cost_pct": 0.3295,
+      "cost_pct_ex_slippage": 0.2295,
+      "cost_pct_2x_stress": 0.4295,
+      "flat_fee_share_pct": 2.1
+    },
+    {
+      "size_inr": 10000000,
+      "cost_inr": 32315.34,
+      "cost_pct": 0.3232,
+      "cost_pct_ex_slippage": 0.2232,
+      "cost_pct_2x_stress": 0.4232,
+      "flat_fee_share_pct": 0.2
+    }
+  ],
+  "minimum_viable_size_inr": 31828,
+  "floor_rule": "smallest size where flat fees (brokerage+DP+GST) <= ex-slippage variable cost; frozen per F21, slippage-independent by construction",
+  "cost_pct_at_reference": 0.3932,
+  "cost_pct_at_reference_2x": 0.4932,
+  "slippage_status": "PROVISIONAL 5bps/side [MEASURE \u2014 unknown #15 open-print study]"
+}
