@@ -1,0 +1,17 @@
+{
+  "generated": "2026-07-08T11:49:09+05:30",
+  "runtime_s": 153,
+  "panel_rows": 1543046,
+  "symbols": 2906,
+  "universe_months": 31,
+  "universe_unique_symbols": 177,
+  "signal_rows": 62785,
+  "atr_sanity_excluded": 295,
+  "atr_pct_median": 0.0271,
+  "atr_pct_p10": 0.0173,
+  "atr_pct_p90": 0.0445,
+  "cost_1x_pct": 0.3932,
+  "cost_2x_pct": 0.4932,
+  "cells_passing_1_to_4": 0,
+  "cells_passing_all": 0
+}

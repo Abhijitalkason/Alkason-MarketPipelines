@@ -1,0 +1,21 @@
+{
+  "gap_beyond_1atr_share": 0.02163,
+  "gap_beyond_2atr_share": 0.00344,
+  "gap_beyond_3atr_share": 0.00051,
+  "stop_exits": 116065,
+  "gap_through_share_of_stops": 0.1384,
+  "loss_beyond_stop_frac_mean": 0.9376,
+  "loss_beyond_stop_frac_p95": 5.1728,
+  "one_night": {
+    "n": 8093,
+    "loss_beyond_mean": 1.2657
+  },
+  "multi_night": {
+    "n": 7972,
+    "loss_beyond_mean": 0.6044
+  },
+  "circuit_lock": {
+    "stop_exits_on_locked_day": 124,
+    "share_of_stops": 0.00107
+  }
+}

@@ -5,6 +5,7 @@
 > **Lineage:** PLAN.md (v1, killed) → PLAN_v3 (intraday, killed) → PLAN_v4 (intraday retarget, kill fired at Gate 2) → v6 (horizon change, the PLAN_v4 §6.5 response)
 > **Status:** v2 — REVISED 2026-07-07 after adversarial deep review (19 findings, §10 amendment log). The v1 §4.7 thresholds approved earlier that day were found **arithmetically unsatisfiable** (F1/F2) and are superseded below. **§4.7 v2 APPROVED by user 2026-07-08** (after end-to-end re-verification, F24) — **thresholds are now FROZEN; Phase 0 may start.** Position size config-driven ₹1k→₹1Cr; universe = 16-list (report-only) + PIT (GO basis) + liquidity tier (robustness); repo stays uncommitted per user instruction.
 > **Plan version:** 2026-07-08 (v2.2 — §4.7 v2 approved & frozen; F24 clarifications: effective-edge disclosure, grid-edge neighbor rule, pre-registered KILL fallback)
+> **PHASE 0 OUTCOME `[MEASURED 2026-07-08]`: KILL** — 0/48 cells pass frozen criteria 1–4; see §4.7 outcome note and `reports/v6/phase0_report.md`. Fallback election pending with user.
 
 ---
 
@@ -224,6 +225,11 @@ cannot be invented after a kill):** the default next step on a Phase 0 or Gate 3
 evaluated on the same measured data with a freshly pre-registered gate before any build**;
 stopping outright remains available at the user's election. **No threshold tuning past
 this point.**
+
+> **OUTCOME `[MEASURED 2026-07-08]`: KILL FIRED.** 0 of 48 cells satisfy criteria 1–4
+> (max pooled WR 0.711 vs band floor 0.72; min empirical δ 6.3 pts vs ceiling 4.0).
+> Full evidence: `reports/v6/phase0_report.md`. Same-day cost: ~3 hours of compute,
+> ₹0 of capital. The pre-registered fallback election is now with the user.
 
 ---
 
