@@ -1,0 +1,151 @@
+{
+  "generated": "2026-07-08T11:55:08+05:30",
+  "symbols_probed": 20,
+  "expected_quarters_per_symbol": 12,
+  "announcement_coverage": 0.4875,
+  "board_meeting_pit_coverage": 0.8042,
+  "median_lead_days": 14.0,
+  "per_symbol": {
+    "AMBER": {
+      "filings": 9,
+      "filed_quarters": 8,
+      "meetings": 18,
+      "meeting_quarters": 12,
+      "median_lead_days": 6.0
+    },
+    "AMBUJACEM": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 18,
+      "meeting_quarters": 12,
+      "median_lead_days": 13.0
+    },
+    "ANGELONE": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 17,
+      "meeting_quarters": 12,
+      "median_lead_days": 21.0
+    },
+    "BDL": {
+      "filings": 9,
+      "filed_quarters": 9,
+      "meetings": 18,
+      "meeting_quarters": 12,
+      "median_lead_days": 11.0
+    },
+    "BEL": {
+      "filings": 9,
+      "filed_quarters": 7,
+      "meetings": 18,
+      "meeting_quarters": 12,
+      "median_lead_days": 18.0
+    },
+    "BPCL": {
+      "filings": 11,
+      "filed_quarters": 7,
+      "meetings": 19,
+      "meeting_quarters": 12,
+      "median_lead_days": 9.0
+    },
+    "BSE": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 18,
+      "meeting_quarters": 12,
+      "median_lead_days": 19.0
+    },
+    "COALINDIA": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 21,
+      "meeting_quarters": 12,
+      "median_lead_days": 14.0
+    },
+    "GROWW": {
+      "filings": 0,
+      "filed_quarters": 0,
+      "meetings": 3,
+      "meeting_quarters": 3,
+      "median_lead_days": 6.0
+    },
+    "GVT&D": {
+      "filings": 0,
+      "filed_quarters": 0,
+      "meetings": 0,
+      "meeting_quarters": 0,
+      "median_lead_days": null
+    },
+    "HCLTECH": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 15,
+      "meeting_quarters": 12,
+      "median_lead_days": 27.0
+    },
+    "HDFCLIFE": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 16,
+      "meeting_quarters": 11,
+      "median_lead_days": 15.0
+    },
+    "HUDCO": {
+      "filings": 13,
+      "filed_quarters": 8,
+      "meetings": 14,
+      "meeting_quarters": 12,
+      "median_lead_days": 8.0
+    },
+    "MOTHERSON": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 18,
+      "meeting_quarters": 12,
+      "median_lead_days": 27.0
+    },
+    "POLYCAB": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 16,
+      "meeting_quarters": 12,
+      "median_lead_days": 14.0
+    },
+    "SAIL": {
+      "filings": 9,
+      "filed_quarters": 7,
+      "meetings": 14,
+      "meeting_quarters": 11,
+      "median_lead_days": 7.5
+    },
+    "SWANENERGY": {
+      "filings": 0,
+      "filed_quarters": 0,
+      "meetings": 0,
+      "meeting_quarters": 0,
+      "median_lead_days": null
+    },
+    "TATAMOTORS": {
+      "filings": 0,
+      "filed_quarters": 0,
+      "meetings": 0,
+      "meeting_quarters": 0,
+      "median_lead_days": null
+    },
+    "TRENT": {
+      "filings": 7,
+      "filed_quarters": 7,
+      "meetings": 18,
+      "meeting_quarters": 12,
+      "median_lead_days": 17.0
+    },
+    "WIPRO": {
+      "filings": 13,
+      "filed_quarters": 8,
+      "meetings": 18,
+      "meeting_quarters": 12,
+      "median_lead_days": 16.0
+    }
+  },
+  "verdict_rule": "board-meeting PIT coverage >= 0.90 => PIT blackout usable; else conservative scheduled-month window"
+}
