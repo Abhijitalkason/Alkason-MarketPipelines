@@ -5,7 +5,8 @@
 > **Lineage:** PLAN.md (v1, killed) → PLAN_v3 (intraday, killed) → PLAN_v4 (intraday retarget, kill fired at Gate 2) → v6 (horizon change, the PLAN_v4 §6.5 response)
 > **Status:** v2 — REVISED 2026-07-07 after adversarial deep review (19 findings, §10 amendment log). The v1 §4.7 thresholds approved earlier that day were found **arithmetically unsatisfiable** (F1/F2) and are superseded below. **§4.7 v2 APPROVED by user 2026-07-08** (after end-to-end re-verification, F24) — **thresholds are now FROZEN; Phase 0 may start.** Position size config-driven ₹1k→₹1Cr; universe = 16-list (report-only) + PIT (GO basis) + liquidity tier (robustness); repo stays uncommitted per user instruction.
 > **Plan version:** 2026-07-08 (v2.2 — §4.7 v2 approved & frozen; F24 clarifications: effective-edge disclosure, grid-edge neighbor rule, pre-registered KILL fallback)
-> **PHASE 0 OUTCOME `[MEASURED 2026-07-08]`: KILL** — 0/48 cells pass frozen criteria 1–4; see §4.7 outcome note and `reports/v6/phase0_report.md`. Fallback election pending with user.
+> **PHASE 0 OUTCOME `[MEASURED 2026-07-08]`: KILL** — 0/48 cells pass frozen criteria 1–4; see §4.7 outcome note and `reports/v6/phase0_report.md`.
+> **PROJECT STATUS: STOPPED — user election 2026-07-08.** The pre-registered fallback (asymmetric R:R) was evaluated against the measured grid and declined: every cell's pre-cost expectancy is negative (best −0.026%/trade vs 0.393% costs) and realized payoff asymmetry collapses under 52–84% time-exit shares at H ≤ 5. Established conclusion: **barrier geometry cannot engineer an edge in NSE equities at any horizon from minutes to a week with this information set.** Data layers, cost model, and measurement machinery remain committed for any future thesis built on a different information source.
 
 ---
 
@@ -229,7 +230,13 @@ this point.**
 > **OUTCOME `[MEASURED 2026-07-08]`: KILL FIRED.** 0 of 48 cells satisfy criteria 1–4
 > (max pooled WR 0.711 vs band floor 0.72; min empirical δ 6.3 pts vs ceiling 4.0).
 > Full evidence: `reports/v6/phase0_report.md`. Same-day cost: ~3 hours of compute,
-> ₹0 of capital. The pre-registered fallback election is now with the user.
+> ₹0 of capital.
+> **ELECTION `[2026-07-08]`: the user elected STOP.** The F24 fallback was assessed
+> against the same measured data before the election: pre-cost expectancy negative in
+> all 48 cells; realized win/loss asymmetry at a=1.5,b=2 collapses to ≈0.9:1 (nominal
+> 0.75:1 target never realized) under 52–84% time-exits; a ≥2:1 realized payoff needs
+> multi-week holds — a fourth horizon change, declined as sunk-cost escalation.
+> Project closed with the evidence file complete.
 
 ---
 

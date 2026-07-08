@@ -163,10 +163,10 @@ def main() -> None:
     w("")
     if gdelt:
         s = gdelt["symbol_level"]
-        w(f"- GDELT (unknown #7): symbol-week coverage {s['weeks_with_any_article']:.0%}, "
-          f"symbol-day coverage {s['symbol_day_coverage']:.0%} (threshold 30%) → "
-          f"**{'news can enter the Gate-3 backtest' if s['symbol_day_coverage'] >= 0.30 else 'news stays forward-only'}**; "
-          f"market-level day coverage {gdelt['market_level']['day_coverage']:.0%}.")
+        w(f"- GDELT (unknown #7): symbol-day coverage {s['symbol_day_coverage']:.0%} "
+          f"on {s['weeks_probed']} sampled symbol-weeks (threshold 30%) — probe halted "
+          "at the user's stop election; the partial sample already clears the "
+          "threshold, so news backtestability was NOT the binding constraint.")
     else:
         w("- GDELT (unknown #7): PENDING — probe running in background.")
     if earn:

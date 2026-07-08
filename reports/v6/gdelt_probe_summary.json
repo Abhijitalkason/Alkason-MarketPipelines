@@ -1,0 +1,24 @@
+{
+  "generated": "2026-07-08T12:24:57+05:30",
+  "symbol_level": {
+    "weeks_probed": 17,
+    "weeks_with_any_article": 1.0,
+    "symbol_day_coverage": 0.9412,
+    "per_symbol_week_coverage": {
+      "APOLLOHOSP": 1.0,
+      "ASIANPAINT": 1.0,
+      "BHARTIARTL": 1.0,
+      "BPCL": 1.0,
+      "LT": 1.0,
+      "TCS": 1.0,
+      "WIPRO": 1.0
+    }
+  },
+  "market_level": {
+    "weeks_probed": 0,
+    "weeks_with_any_article": NaN,
+    "day_coverage": 0.0
+  },
+  "failed_requests": 86,
+  "verdict_rule": "symbol-day coverage >= 0.30 => news enters Gate-3 backtest; else forward-only"
+}

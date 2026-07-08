@@ -1,6 +1,6 @@
 # PLAN_v6 Phase 0 — Feasibility Measurement Report
 
-Generated 2026-07-08T11:55:31+05:30 · grid run 2026-07-08T11:49:09+05:30 (153s) · all numbers `[MEASURED]` unless tagged otherwise
+Generated 2026-07-08T12:26:25+05:30 · grid run 2026-07-08T11:49:09+05:30 (153s) · all numbers `[MEASURED]` unless tagged otherwise
 
 ## VERDICT — against the frozen §4.7 v2 (approved 2026-07-08, pre-measurement)
 
@@ -66,7 +66,7 @@ Geometry-exercised cells (criterion 3 pass) and their gap to the contract:
 
 ## §4.6 / §4.6b probes
 
-- GDELT (unknown #7): PENDING — probe running in background.
+- GDELT (unknown #7): symbol-day coverage 94% on 17 sampled symbol-weeks (threshold 30%) — probe halted at the user's stop election; the partial sample already clears the threshold, so news backtestability was NOT the binding constraint.
 - Earnings PIT (unknown #8): announcement coverage 49%; board-meeting (true PIT) coverage 80% (threshold 90%; median intimation lead 14.0 days).
 
 ## What the fallback would inherit
