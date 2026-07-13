@@ -78,3 +78,63 @@ global/macro channel (one-time / after gaps): `python main.py --mode regime-back
 - Retrain check: `python main.py --mode train-v3` weekly post-market.
 - Recalibration: `python main.py --mode recalibrate` weekly.
 - Gates: `python main.py --mode gates --start S --end E` to refresh evidence.
+
+---
+
+# Daily swing prediction & listing system (src/daily, swing_1_5d)
+
+Contract (2026-07-13): every trading day, a **top-10 LONG watchlist** for the
+1–5-day swing horizon over the **PIT top-100 liquidity universe**, with
+calibrated P(win), entry/target/stop levels (±1.0 daily ATR), reference qty at
+₹1L, SHAP "why", and a chart per pick. Always emits (no silent days); the
+`actionable` flag stays honest to the latest backtest's Milestone-2 verdict.
+
+## Daily evening sequence (post-close, ~18:00 IST, Mon–Fri)
+```
+python main.py --mode bhavcopy            # NSE EOD through today (idempotent)
+python main.py --mode daily-panel         # refresh per-symbol daily panels
+python main.py --mode daily-global        # global/overnight series (yfinance)
+python main.py --mode daily-list          # → reports/daily/lists/list_<today>.json
+```
+The list decided on day T's close is FOR entry at T+1's open.
+
+## Monthly (first weekend)
+```
+python main.py --mode corp-actions        # refresh split/bonus factor table
+python main.py --mode daily-universe      # regenerate data/reference/universe_top100.csv
+python main.py --mode daily-panel         # panels for any new members
+```
+
+## Weekly retrain + honest re-measure
+```
+python main.py --mode daily-backtest      # walk-forward, M1/M2 gates, honest verdict
+python main.py --mode daily-train         # production bundle → models/daily/swing_1_5d/
+```
+
+## Serving (GET API, port 8001)
+```
+python main.py --mode daily-serve         # needs DAILY_API_KEY in .env
+```
+Endpoints (all `X-API-Key`): `/health`, `/daily/list`, `/daily/list/history`,
+`/daily/scoreboard?source=oos|live`, `/daily/chart/{symbol}`.
+
+## Scorekeeping
+- `python main.py --mode daily-eval --date <D>` scores a matured list day.
+- `python main.py --mode daily-scoreboard` = at-scale OOS record;
+  `--start live` = running forward record of shipped lists.
+
+## Honesty ledger (do not delete)
+- v6 Phase 0 (frozen §4.7 v2): KILL — geometry alone cannot engineer ≥80% WR
+  long-only at ≤5-day holds (`reports/v6/phase0_report.md`).
+- next_day experiment (2026-06-29/30): M1 FAIL — AUC ≈ 0.50–0.51, no edge.
+- The swing_1_5d list ships on the user's explicit 2026-07-13 instruction to
+  run end-to-end regardless; the backtest report + `actionable` flag carry the
+  measured truth. Check `reports/daily/run_registry.csv` before trusting picks.
+
+## Ranking note (2026-07-13)
+When the model has no measurable edge its calibrated probabilities tie at the
+base rate (the honest no-signal answer). The list then ranks by a TRANSPARENT
+tie-break — trailing 20-day then 5-day momentum (src/daily/screener.py) — never
+by incidental row order. A meaningfully spread P(win) column is the signal that
+the model has started differentiating; until then treat the list as a
+momentum-ordered watchlist with honest probabilities.

@@ -165,6 +165,106 @@ def cmd_serve(args):
     uvicorn.run("src.api.app:app", host=cfg["host"], port=cfg["port"])
 
 
+# ── daily prediction & listing system (src/daily) ─────────────────────
+
+def _daily_horizon(args) -> str:
+    if args.horizon:
+        return args.horizon
+    from src.daily import enabled_horizons
+    hs = enabled_horizons()
+    if not hs:
+        raise SystemExit("no enabled horizons in config_daily.yaml")
+    return hs[0]
+
+
+def cmd_daily_universe(args):
+    import subprocess
+    import sys as _sys
+    cmd = [_sys.executable, "scripts/build_daily_universe.py"]
+    if args.no_rebuild_panel:
+        cmd.append("--no-rebuild-panel")
+    raise SystemExit(subprocess.call(cmd))
+
+
+def cmd_daily_panel(args):
+    from src.daily import load_daily_config
+    from src.daily.panel import build_panel
+    years = args.years or load_daily_config()["data"]["backfill_years"]
+    start = _today() - timedelta(days=int(years * 365.25))
+    print(json.dumps({"symbols_written": len(build_panel(start, _today(), symbols=args.symbols))}))
+
+
+def cmd_daily_global(args):
+    from src.daily.global_data import fetch_all
+    print(json.dumps(fetch_all(), indent=2, default=str))
+
+
+def cmd_daily_macro(args):
+    from src.daily.macro import build_calendar
+    print(json.dumps(build_calendar(), indent=2, default=str))
+
+
+def cmd_daily_fii_backfill(args):
+    from src.daily.fii_backfill import backfill
+    print(json.dumps(backfill(), indent=2, default=str))
+
+
+def cmd_daily_backtest(args):
+    from src.daily.backtester import run_backtest
+    horizon = _daily_horizon(args)
+    end = date.fromisoformat(args.end) if args.end else _today()
+    start = date.fromisoformat(args.start) if args.start else end - timedelta(days=3 * 365)
+    rep = run_backtest(start, end, horizon=horizon,
+                       args_note=f"cli {horizon} {start}..{end}")
+    print(json.dumps({"verdict": rep["verdict"],
+                      "milestone1": rep["milestone1_predictive"]["criteria"],
+                      "milestone2": rep["milestone2_after_cost"]["criteria"]},
+                     indent=2, default=str))
+
+
+def cmd_daily_train(args):
+    from src.daily.trainer import train_production
+    horizon = _daily_horizon(args)
+    end = date.fromisoformat(args.end) if args.end else _today()
+    print(json.dumps(train_production(horizon=horizon, end_day=end, tune=args.tune).__dict__,
+                     indent=2, default=str))
+
+
+def cmd_daily_list(args):
+    from src.daily.run_list import run
+    day = date.fromisoformat(args.date) if args.date else _today()
+    horizons = [args.horizon] if args.horizon else None
+    out = run(day=day, horizons=horizons)
+    for h, block in out["horizons"].items():
+        print(f"\n=== {h} (actionable={block['actionable']}) ===")
+        for pick in block["picks"]:
+            tgt = pick.get("target_price"); stp = pick.get("stop_price")
+            ref = pick.get("ref_close"); qty = pick.get("qty_ref")
+            print(f"  {pick['symbol']:12s} P(win)={pick['prob']:.3f}"
+                  f"  ref={ref}  target={tgt}  stop={stp}  qty@1L={qty}"
+                  f"  hold<={pick.get('max_hold_days')}d  {', '.join(pick['why'])}")
+
+
+def cmd_daily_eval(args):
+    from src.daily.evaluate import evaluate_day
+    day = date.fromisoformat(args.date) if args.date else _today() - timedelta(days=1)
+    print(json.dumps(evaluate_day(day, horizon=_daily_horizon(args)), indent=2, default=str))
+
+
+def cmd_daily_scoreboard(args):
+    from src.daily.evaluate import scoreboard, scoreboard_from_oos
+    horizon = _daily_horizon(args)
+    out = scoreboard(horizon) if args.start == "live" else scoreboard_from_oos(horizon)
+    print(json.dumps(out, indent=2, default=str))
+
+
+def cmd_daily_serve(args):
+    import uvicorn
+    from src.daily import load_daily_config
+    cfg = load_daily_config()["api"]
+    uvicorn.run("src.api.daily_app:app", host=cfg["host"], port=cfg["port"])
+
+
 def main():
     p = argparse.ArgumentParser(description="Intraday Selective Signal System (v3)")
     p.add_argument("--mode", required=True, choices=[
@@ -172,6 +272,9 @@ def main():
         "backtest", "train-v3", "promote", "rollback", "recalibrate", "paper",
         "drift", "gates", "serve",
         "regime-capture", "regime-backfill", "news-capture",   # PLAN_v4 §5/§8
+        "daily-universe", "daily-panel", "daily-global", "daily-macro",   # src/daily
+        "daily-fii-backfill", "daily-backtest", "daily-train", "daily-list",
+        "daily-eval", "daily-scoreboard", "daily-serve",
     ])
     p.add_argument("--symbols", nargs="+", default=None)
     p.add_argument("--years", type=int, default=None)
@@ -187,6 +290,11 @@ def main():
     p.add_argument("--version", type=str, default=None)
     p.add_argument("--confirm", action="store_true", default=False)
     p.add_argument("--capital", type=float, default=1_000_000)
+    p.add_argument("--horizon", type=str, default=None,
+                   help="daily-* modes: horizon block from config_daily.yaml "
+                        "(default: first enabled)")
+    p.add_argument("--no-rebuild-panel", action="store_true", default=False,
+                   help="daily-universe: reuse the cached v6 panel")
     args = p.parse_args()
 
     dispatch = {
@@ -197,6 +305,12 @@ def main():
         "drift": cmd_drift, "gates": cmd_gates, "serve": cmd_serve,
         "regime-capture": cmd_regime_capture, "regime-backfill": cmd_regime_backfill,
         "news-capture": cmd_news_capture,
+        "daily-universe": cmd_daily_universe, "daily-panel": cmd_daily_panel,
+        "daily-global": cmd_daily_global, "daily-macro": cmd_daily_macro,
+        "daily-fii-backfill": cmd_daily_fii_backfill, "daily-backtest": cmd_daily_backtest,
+        "daily-train": cmd_daily_train, "daily-list": cmd_daily_list,
+        "daily-eval": cmd_daily_eval, "daily-scoreboard": cmd_daily_scoreboard,
+        "daily-serve": cmd_daily_serve,
     }
     dispatch[args.mode](args)
 

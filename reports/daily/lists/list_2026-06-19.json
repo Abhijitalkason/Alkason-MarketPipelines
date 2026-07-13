@@ -1,0 +1,71 @@
+{
+  "date": "2026-06-19",
+  "generated": "2026-06-29T11:34:49",
+  "horizons": {
+    "next_day": {
+      "actionable": false,
+      "picks": [
+        {
+          "symbol": "ASIANPAINT",
+          "direction": "LONG",
+          "prob": 1.0,
+          "why": [
+            "post-earnings drift (+)",
+            "futures basis (-)",
+            "1-day momentum (+)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-06-19\\ASIANPAINT_next_day.png",
+          "actionable": false
+        },
+        {
+          "symbol": "BAJAJFINSV",
+          "direction": "LONG",
+          "prob": 1.0,
+          "why": [
+            "post-earnings drift (+)",
+            "RSI(14) (+)",
+            "futures basis (+)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-06-19\\BAJAJFINSV_next_day.png",
+          "actionable": false
+        },
+        {
+          "symbol": "BPCL",
+          "direction": "LONG",
+          "prob": 1.0,
+          "why": [
+            "1-day momentum (+)",
+            "post-earnings drift (+)",
+            "RSI(14) (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-06-19\\BPCL_next_day.png",
+          "actionable": false
+        },
+        {
+          "symbol": "BRITANNIA",
+          "direction": "LONG",
+          "prob": 1.0,
+          "why": [
+            "post-earnings drift (+)",
+            "RSI(14) (+)",
+            "futures basis (+)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-06-19\\BRITANNIA_next_day.png",
+          "actionable": false
+        },
+        {
+          "symbol": "CIPLA",
+          "direction": "LONG",
+          "prob": 1.0,
+          "why": [
+            "post-earnings drift (+)",
+            "RSI(14) (+)",
+            "futures basis (+)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-06-19\\CIPLA_next_day.png",
+          "actionable": false
+        }
+      ]
+    }
+  }
+}

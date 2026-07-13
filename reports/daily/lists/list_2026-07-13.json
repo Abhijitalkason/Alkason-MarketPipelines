@@ -1,0 +1,231 @@
+{
+  "date": "2026-07-13",
+  "generated": "2026-07-13T20:19:50",
+  "horizons": {
+    "swing_1_5d": {
+      "actionable": false,
+      "picks": [
+        {
+          "symbol": "PAYTM",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\PAYTM_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1386.5,
+          "entry_rule": "next session open",
+          "target_price": 1430.13,
+          "stop_price": 1342.87,
+          "target_pct": 3.15,
+          "stop_pct": 3.15,
+          "max_hold_days": 5,
+          "qty_ref": 72,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03146669414249653
+        },
+        {
+          "symbol": "CDSL",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\CDSL_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1444.5,
+          "entry_rule": "next session open",
+          "target_price": 1480.72,
+          "stop_price": 1408.28,
+          "target_pct": 2.51,
+          "stop_pct": 2.51,
+          "max_hold_days": 5,
+          "qty_ref": 69,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.02507540918755872
+        },
+        {
+          "symbol": "ETERNAL",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\ETERNAL_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 285.2,
+          "entry_rule": "next session open",
+          "target_price": 293.46,
+          "stop_price": 276.94,
+          "target_pct": 2.9,
+          "stop_pct": 2.9,
+          "max_hold_days": 5,
+          "qty_ref": 350,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.02897715888599478
+        },
+        {
+          "symbol": "DIXON",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\DIXON_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 13490.0,
+          "entry_rule": "next session open",
+          "target_price": 13934.79,
+          "stop_price": 13045.21,
+          "target_pct": 3.3,
+          "stop_pct": 3.3,
+          "max_hold_days": 5,
+          "qty_ref": 7,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03297151329026792
+        },
+        {
+          "symbol": "DLF",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\DLF_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 682.35,
+          "entry_rule": "next session open",
+          "target_price": 703.6,
+          "stop_price": 661.1,
+          "target_pct": 3.11,
+          "stop_pct": 3.11,
+          "max_hold_days": 5,
+          "qty_ref": 146,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.031147609626396178
+        },
+        {
+          "symbol": "COFORGE",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\COFORGE_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1540.9,
+          "entry_rule": "next session open",
+          "target_price": 1596.16,
+          "stop_price": 1485.64,
+          "target_pct": 3.59,
+          "stop_pct": 3.59,
+          "max_hold_days": 5,
+          "qty_ref": 64,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03586493978472692
+        },
+        {
+          "symbol": "CHOLAFIN",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\CHOLAFIN_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1810.9,
+          "entry_rule": "next session open",
+          "target_price": 1857.73,
+          "stop_price": 1764.07,
+          "target_pct": 2.59,
+          "stop_pct": 2.59,
+          "max_hold_days": 5,
+          "qty_ref": 55,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.025859280704937575
+        },
+        {
+          "symbol": "HCLTECH",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\HCLTECH_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1221.2,
+          "entry_rule": "next session open",
+          "target_price": 1263.38,
+          "stop_price": 1179.02,
+          "target_pct": 3.45,
+          "stop_pct": 3.45,
+          "max_hold_days": 5,
+          "qty_ref": 81,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03453862711150626
+        },
+        {
+          "symbol": "INDUSINDBK",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\INDUSINDBK_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1012.9,
+          "entry_rule": "next session open",
+          "target_price": 1039.58,
+          "stop_price": 986.22,
+          "target_pct": 2.63,
+          "stop_pct": 2.63,
+          "max_hold_days": 5,
+          "qty_ref": 98,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.026342326840895304
+        },
+        {
+          "symbol": "BAJFINANCE",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "India VIX move (-)"
+          ],
+          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\BAJFINANCE_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1022.6,
+          "entry_rule": "next session open",
+          "target_price": 1049.23,
+          "stop_price": 995.97,
+          "target_pct": 2.6,
+          "stop_pct": 2.6,
+          "max_hold_days": 5,
+          "qty_ref": 97,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.02604355843647847
+        }
+      ]
+    }
+  }
+}

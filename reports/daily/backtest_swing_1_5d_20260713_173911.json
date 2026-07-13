@@ -1,0 +1,103 @@
+{
+  "generated": "2026-07-13T17:39:11",
+  "horizon": "swing_1_5d",
+  "window": {
+    "start": "2023-07-14",
+    "end": "2026-07-13"
+  },
+  "n_oos_rows": 39809,
+  "n_folds": 7,
+  "geometric_baseline": 0.5,
+  "milestone1_predictive": {
+    "oos_auc": 0.49890604185655973,
+    "auc_per_fold": [
+      0.5,
+      0.48973146711355175,
+      0.5122739171508943,
+      0.47036453093272323,
+      0.4967436244817866,
+      0.48635011172166287,
+      0.5
+    ],
+    "fold_consistency": 0.14285714285714285,
+    "log_loss": 0.714460411622118,
+    "log_loss_floor": 0.6931471805599453,
+    "brier": 0.2599506480892215,
+    "calibration_gap": 0.016985829348131365,
+    "base_rate": 0.47391293426109676,
+    "precision_at_n": 0.47443609022556393,
+    "lift": 1.0011039073353902,
+    "top_n": 10,
+    "criteria": {
+      "auc_ok": false,
+      "fold_consistency_ok": false,
+      "calibration_ok": true,
+      "lift_ok": false
+    },
+    "passed": false
+  },
+  "milestone2_after_cost": {
+    "net_expectancy": -0.0030506082877182704,
+    "net_expectancy_stress": -0.005425022769212775,
+    "gross_expectancy": -0.0006761938062237655,
+    "mean_cost": 0.0023744144814945053,
+    "n_picks": 3990,
+    "criteria": {
+      "expectancy_ok": false,
+      "stress_ok": false
+    },
+    "passed": false
+  },
+  "fold_stats": [
+    {
+      "fold": 1,
+      "n": 6300,
+      "auc": 0.5,
+      "up_rate": 0.370952380952381,
+      "calib_brier": 0.2391245895476761
+    },
+    {
+      "fold": 2,
+      "n": 5885,
+      "auc": 0.48973146711355175,
+      "up_rate": 0.5653355989804588,
+      "calib_brier": 0.23489330701770567
+    },
+    {
+      "fold": 3,
+      "n": 6300,
+      "auc": 0.5122739171508943,
+      "up_rate": 0.4580952380952381,
+      "calib_brier": 0.24267337289639698
+    },
+    {
+      "fold": 4,
+      "n": 6174,
+      "auc": 0.47036453093272323,
+      "up_rate": 0.518140589569161,
+      "calib_brier": 0.24263988848393697
+    },
+    {
+      "fold": 5,
+      "n": 6300,
+      "auc": 0.4967436244817866,
+      "up_rate": 0.4531746031746032,
+      "calib_brier": 0.24673528242369738
+    },
+    {
+      "fold": 6,
+      "n": 5880,
+      "auc": 0.48635011172166287,
+      "up_rate": 0.4814625850340136,
+      "calib_brier": 0.2468302316739632
+    },
+    {
+      "fold": 7,
+      "n": 2970,
+      "auc": 0.5,
+      "up_rate": 0.4818181818181818,
+      "calib_brier": 0.24890868589564488
+    }
+  ],
+  "verdict": "M1 FAIL \u2014 no measurable predictive edge at this horizon/data (honest no)"
+}
