@@ -1,6 +1,6 @@
 # PLAN_v6 Phase 0 — Feasibility Measurement Report
 
-Generated 2026-07-10T11:58:23+05:30 · grid run 2026-07-10T11:53:44+05:30 (141s) · all numbers `[MEASURED]` unless tagged otherwise
+Generated 2026-07-13T10:01:15+05:30 · grid run 2026-07-13T10:00:51+05:30 (150s) · all numbers `[MEASURED]` unless tagged otherwise
 
 ## Revision note (review 2, 2026-07-10) — evidence-quality repair, verdict unchanged
 
