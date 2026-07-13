@@ -1,6 +1,6 @@
 # Phase 0 §4.4 — Delivery cost curve c(size) — broker: Upstox
 
-Generated: 2026-07-08T11:05:59+05:30 · constants: upstox.com/brokerage-charges [VERIFIED 2026-07-08]
+Generated: 2026-07-10T09:04:09+05:30 · constants: upstox.com/brokerage-charges [VERIFIED 2026-07-08]
 
 | Size (₹) | Cost (₹) | c(size) % | ex-slippage % | 2× stress % | flat-fee share |
 |---|---|---|---|---|---|

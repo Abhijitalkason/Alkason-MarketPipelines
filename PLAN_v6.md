@@ -7,6 +7,7 @@
 > **Plan version:** 2026-07-08 (v2.2 — §4.7 v2 approved & frozen; F24 clarifications: effective-edge disclosure, grid-edge neighbor rule, pre-registered KILL fallback)
 > **PHASE 0 OUTCOME `[MEASURED 2026-07-08]`: KILL** — 0/48 cells pass frozen criteria 1–4; see §4.7 outcome note and `reports/v6/phase0_report.md`.
 > **PROJECT STATUS: STOPPED — user election 2026-07-08.** The pre-registered fallback (asymmetric R:R) was evaluated against the measured grid and declined: every cell's pre-cost expectancy is negative (best −0.026%/trade vs 0.393% costs) and realized payoff asymmetry collapses under 52–84% time-exit shares at H ≤ 5. Established conclusion: **barrier geometry cannot engineer an edge in NSE equities at any horizon from minutes to a week with this information set.** Data layers, cost model, and measurement machinery remain committed for any future thesis built on a different information source.
+> **REVIEW 2 `[2026-07-10]`: implementation audit post-KILL** — found and fixed an incomplete corporate-action table (F25/F26, splits/demergers absent, a handful of holds mispriced as fake stop-outs) and zero test coverage on the GO/KILL evaluator (F27). Re-measured: **KILL verdict unchanged** (max pooled WR 0.7106→0.7108, min required δ 6.27→5.55 pts — both walls move <1pt, unaffected order-of-magnitude). No §4.7 v2 threshold was touched. See §10 "Review 2" and `reports/v6/phase0_report.md`.
 
 ---
 
@@ -133,6 +134,9 @@ against §4.7 v2. No system building. User reviews before Phase 1 exists.
 ### 4.2 Daily triple-barrier labeler (adaptation)
 - Entry = next day's open; target/stop = entry ± a/b × ATR_daily; time barrier = H
   trading days (exit at close of day H); conservative dual-touch ⇒ stop.
+- **Win convention (stated explicitly — review 2):** a trade is a win if it exits at
+  target, OR if it exits at the time barrier with a positive return. Time-exit wins
+  count toward the measured win rate exactly like target-hit wins.
 - **Tie-break bias quantified:** re-resolve the 46 bar-store names on 1-min paths;
   report the disagreement rate `[MEASURE — qualifies every other result]`.
 
@@ -152,7 +156,8 @@ Per cell, mandatory columns:
   and the minimum-viable-size floor is frozen **before any geometry cell is evaluated**,
   so a cell can never be selected that only works for institutional capital.
 - STT 0.1% buy AND sell · stamp 0.015% buy · exchange txn + SEBI · GST · brokerage
-  (₹0–20/order) · DP ≈ ₹15 flat per sell scrip-day · next-open slippage capped by
+  (₹0–20/order) · DP ₹20 flat per sell scrip-day (verified against Upstox's schedule,
+  corrected from an earlier "≈₹15" estimate — review 2) · next-open slippage capped by
   **pre-open auction volume** participation (not daily turnover, F18).
 - **Open-print slippage measured, not assumed (F23):** the opening print is chaotic;
   the slippage constant is set from the empirical distribution of (next-open fill vs
@@ -207,7 +212,9 @@ window) and the impact on signal rate is reported. `[MEASURE]`
 3. **geometry genuinely exercised (F13):** stop-hit share ≥ 10% AND time-exit share ≤ 40%;
 4. **empirical required δ** (from the measured exit mix, F11) ≤ **4.0 points** at 1× costs
    and ≤ **6.0 points** at 2× slippage stress, at the ₹1L reference size;
-5. gap risk bounded: expected loss beyond stop ≤ 25% of stop distance (weekend split
+5. gap risk bounded: expected loss beyond stop ≤ 25% of stop distance — **estimator:
+   mean, over all stop-exit trades pooled across the cell, of (loss beyond the stop
+   level) / (entry-to-stop distance)** (stated explicitly — review 2) (weekend split
    reported);
 6. tie-break bias (4.2) ≤ 5 points, else all daily-OHLC results re-based on the
    1-min-verified subset.
@@ -358,6 +365,16 @@ Phase 0 (2–3 days) ─► user reviews report
 | F22 | MINOR | *(external)* circuit-lock tail factor added to §4.5 gap model |
 | F23 | MINOR | *(external)* post-event drift named as sub-strategy with own fairness cut; open-print slippage set empirically (unknown #15) |
 | F24 | — | *(approval review 2026-07-08)* §4.7 v2 re-verified end-to-end and **approved by user; thresholds frozen**. Three pre-measurement clarifications recorded: (a) effective required edge = max(0.80 − baseline, empirical δ), up to 8pts at band bottom — must be printed per qualifying cell in the Phase 0 report; (b) grid-edge cells evaluated on all existing neighbors (2–4); (c) KILL fallback pre-registered: default = re-contract to asymmetric R:R (~45–60% WR, ≥2:1 payoff) under a fresh pre-registered gate; stop remains the user's election |
+
+### Review 2 — post-KILL implementation audit (2026-07-10)
+
+Independent review of the implementation against this plan, conducted **after** the Phase 0 KILL was already fired and the user's STOP election recorded. Scope: verify the KILL is not an artifact of an implementation defect. Findings below are evidence-quality repairs only — **§4.7 v2 thresholds were not touched, and the verdict is unchanged** (re-measured: max pooled WR 0.7108 vs band floor 0.72; min empirical δ 5.55 vs ceiling 4.0 — both walls move by <1pt, an order of magnitude short of flipping either). Full before/after numbers: `reports/v6/phase0_report.md` revision note.
+
+| F# | Severity | Finding → disposition |
+|---|---|---|
+| F25 | MAJOR | Corporate-action table (`data/reference/corporate_actions.csv`) covered BONUS issues only (170/170 rows) — splits and demergers (NAUKRI, DRREDDY, SHRIRAMFIN, TATAMOTORS demerger, etc.) were unadjusted, mispricing a handful of holds as fake ≈−80% stop-outs. NSE bhavcopy's own `prev_close` is not exchange-adjusted for either, so no external feed closes the gap → added a discontinuity detector (`src/v6/panel.py::_detect_residual_ca`, empirical open/prev-close ratio outside [0.5×, 2.0×], threshold fixed *before* validating against known cases, not retuned after). Disclosed residual gap: actions whose ratio lands inside that band (e.g. a clean 2:1 split plus a small same-day return) still slip through — a permanent `[MEASURE]` tripwire in `scripts/v6_phase0_grid.py` now surfaces any single-trade loss beyond −30% rather than hiding it. **(added point after review 2)** |
+| F26 | MAJOR | Two consequences of F25 were disclosure defects, not measurement defects: (a) §4.5 gap-risk tail was inflated by the F25 artifacts — published p95 loss-beyond-stop was **5.17×** stop distance, corrected to **1.30×**; this table is explicitly named in F24 as an asset the fallback inherits, so it was the one number in the evidence file that was actively misleading. (b) The labeler's signal-day range was `n − H − 1`, one short of `n − H`, silently dropping the last valid signal per (symbol, cell) — fixed. **(added point after review 2)** |
+| F27 | MINOR | `src/v6/grid.py` — the module that computes the GO/KILL verdict itself — had zero test coverage; added `tests/test_v6_grid.py` (hand-computed δ, a frozen-threshold-drift tripwire asserting the constants match this plan's §4.7 v2 verbatim, F24 grid-edge `neighbors()` cases, end-to-end `evaluate_go_kill`). Also: added the F19 ex-date-in-hold counter the original implementation never wired up (`ca_in_hold` per label row); added the delisting/merger tail count §4.1 promised (7 universe symbols with truncated series: GMRINFRA, IBULHSGFIN, LTIM, PEL, SWANENERGY, TATAMOTORS, ZOMATO); moved `src/v6/universe.py`'s hard-coded constants (TOP_N, lookback, traded/locked-share thresholds) into `config_v3.yaml`'s `v6.universe` block for auditability. **(added point after review 2)** |
 
 ---
 

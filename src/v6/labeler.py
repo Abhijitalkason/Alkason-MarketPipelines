@@ -18,6 +18,14 @@ win := target exit, or time exit with positive return. Short mirror labels
 
 Vectorized with (n_signals × H) windows per symbol per cell — the 48-cell
 grid over ~78k universe signal rows resolves in seconds, not hours.
+
+**F26 (review 2, 2026-07-10):** the signal-day range was `n - H - 1`, one
+short of `n - H` — the last valid signal day per (symbol, cell) was silently
+dropped. Fixed; verified against the hand-computed path tests, which only
+assert on `iloc[0]` and are unaffected. Also adds `ca_in_hold` (F19): whether
+a corporate-action ex-date (see src.v6.panel, F25) falls in
+[entry_date, exit_date] for that trade — the disclosure PLAN_v6 §4.1
+promised but the original implementation never wired up.
 """
 
 from __future__ import annotations
@@ -49,10 +57,13 @@ def all_cells() -> list[Cell]:
     return [Cell(a, b, h) for a in GRID_A for b in GRID_B for h in GRID_H]
 
 
-def label_symbol(sym_df: pd.DataFrame, cell: Cell, side: str = "long") -> pd.DataFrame:
+def label_symbol(sym_df: pd.DataFrame, cell: Cell, side: str = "long",
+                 ca_ex_dates: np.ndarray | None = None) -> pd.DataFrame:
     """Resolve every eligible signal day for one symbol under one cell.
 
     sym_df: one symbol's panel rows sorted by date (adjusted OHLC + atr_pct).
+    ca_ex_dates: this symbol's corporate-action ex-dates (F19), used to flag
+    holds that straddle one; None/empty disables the check (ca_in_hold=False).
     Returns one row per signal with exit type, return, and gap diagnostics.
     """
     o = sym_df["open"].to_numpy(float)
@@ -64,7 +75,7 @@ def label_symbol(sym_df: pd.DataFrame, cell: Cell, side: str = "long") -> pd.Dat
     n = len(sym_df)
     H = cell.h
 
-    sig = np.arange(n - H - 1)                      # signal day index D
+    sig = np.arange(n - H)                           # signal day index D (F26: was n-H-1, dropped the last valid signal)
     sig = sig[np.isfinite(atr_abs[sig]) & (atr_abs[sig] > 0)]
     if len(sig) == 0:
         return pd.DataFrame()
@@ -133,6 +144,15 @@ def label_symbol(sym_df: pd.DataFrame, cell: Cell, side: str = "long") -> pd.Dat
         & ~gap_tgt[np.arange(m), first]
 
     exit_idx = idx[np.arange(m), exit_off]
+
+    # F19/F25: does any corporate-action ex-date fall in [entry_date, exit_date]?
+    if ca_ex_dates is not None and len(ca_ex_dates):
+        ex_flag = np.isin(dates, ca_ex_dates)
+        cum_ex = np.cumsum(ex_flag)
+        ca_in_hold = (cum_ex[exit_idx] - cum_ex[sig]) > 0
+    else:
+        ca_in_hold = np.zeros(m, dtype=bool)
+
     return pd.DataFrame({
         "symbol": sym_df["symbol"].iloc[0],
         "signal_date": dates[sig],
@@ -151,6 +171,7 @@ def label_symbol(sym_df: pd.DataFrame, cell: Cell, side: str = "long") -> pd.Dat
         # calendar days between the exit day and the prior trading day:
         # > 1 means the overnight gap spanned a weekend/holiday (F17)
         "multi_night_gap": _prev_gap_days(dates)[exit_idx] > 1,
+        "ca_in_hold": ca_in_hold,
     })
 
 
@@ -160,22 +181,30 @@ def _prev_gap_days(dates: np.ndarray) -> np.ndarray:
 
 
 def label_universe(panel: pd.DataFrame, in_universe: pd.Series, cell: Cell,
-                   side: str = "long") -> pd.DataFrame:
+                   side: str = "long",
+                   ca_events: pd.DataFrame | None = None) -> pd.DataFrame:
     """Label every in-universe signal row for one cell across all symbols.
 
     Membership gates the SIGNAL day only — the resolution path always runs on
     the symbol's full contiguous series, so a name rotating out of the
     universe mid-hold still resolves on real prices (delistings simply
     truncate the series and are counted upstream as tail events).
+
+    ca_events: the combined (symbol, ex_date) table from src.v6.panel
+    (F19/F25) — if given, each label row is flagged `ca_in_hold`.
     """
     sig_keys = set(
         panel.loc[in_universe, "symbol"] + "|"
         + panel.loc[in_universe, "date"].dt.strftime("%Y-%m-%d")
     )
     eligible_syms = panel.loc[in_universe, "symbol"].unique()
+    ca_by_symbol = ({sym: g["ex_date"].to_numpy()
+                     for sym, g in ca_events.groupby("symbol", sort=False)}
+                    if ca_events is not None else {})
     frames = []
     for sym, sym_df in panel[panel["symbol"].isin(eligible_syms)].groupby("symbol", sort=False):
-        res = label_symbol(sym_df.reset_index(drop=True), cell, side)
+        res = label_symbol(sym_df.reset_index(drop=True), cell, side,
+                           ca_ex_dates=ca_by_symbol.get(sym))
         if len(res):
             key = sym + "|" + pd.to_datetime(res["signal_date"]).dt.strftime("%Y-%m-%d")
             res = res[key.isin(sig_keys)]

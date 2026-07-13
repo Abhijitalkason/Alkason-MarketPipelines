@@ -1,17 +1,73 @@
 {
-  "generated": "2026-07-08T11:49:09+05:30",
-  "runtime_s": 153,
+  "generated": "2026-07-10T11:53:44+05:30",
+  "runtime_s": 141,
   "panel_rows": 1543046,
   "symbols": 2906,
   "universe_months": 31,
   "universe_unique_symbols": 177,
-  "signal_rows": 62785,
-  "atr_sanity_excluded": 295,
+  "signal_rows": 62966,
+  "atr_sanity_excluded": 114,
   "atr_pct_median": 0.0271,
   "atr_pct_p10": 0.0173,
-  "atr_pct_p90": 0.0445,
+  "atr_pct_p90": 0.0446,
   "cost_1x_pct": 0.3932,
   "cost_2x_pct": 0.4932,
   "cells_passing_1_to_4": 0,
-  "cells_passing_all": 0
+  "cells_passing_all": 0,
+  "ca_events_csv_bonus": 170,
+  "ca_events_detected_residual": 254,
+  "ca_in_hold_share_mean_across_cells": 0.0012,
+  "extreme_loss_tripwire_threshold": -0.3,
+  "extreme_loss_tripwire_label_rows": 441,
+  "extreme_loss_tripwire_unique_events": 9,
+  "extreme_loss_tripwire_events": [
+    [
+      "BAJFINANCE",
+      "2025-06-16"
+    ],
+    [
+      "COCHINSHIP",
+      "2024-01-10"
+    ],
+    [
+      "MAZDOCK",
+      "2024-12-27"
+    ],
+    [
+      "PAYTM",
+      "2024-02-14"
+    ],
+    [
+      "PERSISTENT",
+      "2024-03-28"
+    ],
+    [
+      "SILVERBEES",
+      "2026-02-02"
+    ],
+    [
+      "SJVN",
+      "2024-02-13"
+    ],
+    [
+      "TATAMOTORS",
+      "2025-10-14"
+    ],
+    [
+      "ZEEL",
+      "2024-01-23"
+    ]
+  ],
+  "delisting_tail": {
+    "universe_symbols_with_truncated_series": 7,
+    "symbols_sample": [
+      "GMRINFRA",
+      "IBULHSGFIN",
+      "LTIM",
+      "PEL",
+      "SWANENERGY",
+      "TATAMOTORS",
+      "ZOMATO"
+    ]
+  }
 }

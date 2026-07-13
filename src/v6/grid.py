@@ -73,6 +73,12 @@ def cell_stats(labels: pd.DataFrame, cell: Cell, cost_1x: float,
         "delta_req_1x": required_delta_points(labels, cost_1x),
         "delta_req_2x": required_delta_points(labels, cost_2x),
         "theory_floor": cell.b / (cell.a + cell.b),
+        # F19/F25 (review 2): holds whose window straddles a corporate-action
+        # ex-date (bonus, split, or detected residual) — disclosed, not excluded.
+        "ca_in_hold_share": (labels["ca_in_hold"].mean()
+                             if "ca_in_hold" in labels.columns else float("nan")),
+        "ca_in_hold_n": (int(labels["ca_in_hold"].sum())
+                        if "ca_in_hold" in labels.columns else 0),
     }
     if short_labels is not None and len(short_labels):
         out["wr_short_mirror"] = short_labels["win"].mean()

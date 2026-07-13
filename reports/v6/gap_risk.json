@@ -1,18 +1,18 @@
 {
   "gap_beyond_1atr_share": 0.02163,
-  "gap_beyond_2atr_share": 0.00344,
+  "gap_beyond_2atr_share": 0.00343,
   "gap_beyond_3atr_share": 0.00051,
-  "stop_exits": 116065,
-  "gap_through_share_of_stops": 0.1384,
-  "loss_beyond_stop_frac_mean": 0.9376,
-  "loss_beyond_stop_frac_p95": 5.1728,
+  "stop_exits": 115799,
+  "gap_through_share_of_stops": 0.1311,
+  "loss_beyond_stop_frac_mean": 0.4071,
+  "loss_beyond_stop_frac_p95": 1.298,
   "one_night": {
-    "n": 8093,
-    "loss_beyond_mean": 1.2657
+    "n": 502,
+    "loss_beyond_mean": 0.2413
   },
   "multi_night": {
-    "n": 7972,
-    "loss_beyond_mean": 0.6044
+    "n": 421,
+    "loss_beyond_mean": 0.3133
   },
   "circuit_lock": {
     "stop_exits_on_locked_day": 124,
