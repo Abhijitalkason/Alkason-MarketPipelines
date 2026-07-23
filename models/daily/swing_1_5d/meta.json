@@ -1,0 +1,14 @@
+{
+  "horizon": "swing_1_5d",
+  "trained_through": "2026-07-13",
+  "n_rows": 61548,
+  "schema_version": "daily-v1",
+  "bundle_dir": "C:\\Projects\\Alkason-MarketPipelines\\models\\daily\\swing_1_5d",
+  "trained_at": "2026-07-13T20:15:46.402277",
+  "feature_flags": {
+    "fno_enabled": true,
+    "global_enabled": true,
+    "macro_enabled": true,
+    "sentiment_enabled": false
+  }
+}

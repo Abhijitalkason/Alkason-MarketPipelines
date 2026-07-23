@@ -1,0 +1,268 @@
+{
+  "date": "2026-07-21",
+  "generated": "2026-07-22T10:27:40",
+  "horizons": {
+    "swing_1_5d": {
+      "actionable": false,
+      "picks": [
+        {
+          "rank": 1,
+          "symbol": "PAYTM",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/PAYTM_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1300.5,
+          "entry_rule": "next session open",
+          "target_price": 1348.89,
+          "stop_price": 1252.11,
+          "target_pct": 3.72,
+          "stop_pct": 3.72,
+          "max_hold_days": 5,
+          "qty_ref": 76,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.037210962816499174
+        },
+        {
+          "rank": 2,
+          "symbol": "DIXON",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/DIXON_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 14118.0,
+          "entry_rule": "next session open",
+          "target_price": 14637.71,
+          "stop_price": 13598.29,
+          "target_pct": 3.68,
+          "stop_pct": 3.68,
+          "max_hold_days": 5,
+          "qty_ref": 7,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.036812174933721895
+        },
+        {
+          "rank": 3,
+          "symbol": "INDUSINDBK",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/INDUSINDBK_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1063.45,
+          "entry_rule": "next session open",
+          "target_price": 1090.56,
+          "stop_price": 1036.34,
+          "target_pct": 2.55,
+          "stop_pct": 2.55,
+          "max_hold_days": 5,
+          "qty_ref": 94,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.02549317249115078
+        },
+        {
+          "rank": 4,
+          "symbol": "HCLTECH",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/HCLTECH_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1239.5,
+          "entry_rule": "next session open",
+          "target_price": 1282.27,
+          "stop_price": 1196.73,
+          "target_pct": 3.45,
+          "stop_pct": 3.45,
+          "max_hold_days": 5,
+          "qty_ref": 80,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03450700167118079
+        },
+        {
+          "rank": 5,
+          "symbol": "TECHM",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/TECHM_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1576.3,
+          "entry_rule": "next session open",
+          "target_price": 1625.48,
+          "stop_price": 1527.12,
+          "target_pct": 3.12,
+          "stop_pct": 3.12,
+          "max_hold_days": 5,
+          "qty_ref": 63,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.031198738456240202
+        },
+        {
+          "rank": 6,
+          "symbol": "BAJFINANCE",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/BAJFINANCE_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1069.2,
+          "entry_rule": "next session open",
+          "target_price": 1093.8,
+          "stop_price": 1044.6,
+          "target_pct": 2.3,
+          "stop_pct": 2.3,
+          "max_hold_days": 5,
+          "qty_ref": 93,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.023007856341189688
+        },
+        {
+          "rank": 7,
+          "symbol": "ETERNAL",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/ETERNAL_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 286.6,
+          "entry_rule": "next session open",
+          "target_price": 295.03,
+          "stop_price": 278.17,
+          "target_pct": 2.94,
+          "stop_pct": 2.94,
+          "max_hold_days": 5,
+          "qty_ref": 348,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.029421293988635216
+        },
+        {
+          "rank": 8,
+          "symbol": "DLF",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/DLF_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 673.65,
+          "entry_rule": "next session open",
+          "target_price": 695.47,
+          "stop_price": 651.83,
+          "target_pct": 3.24,
+          "stop_pct": 3.24,
+          "max_hold_days": 5,
+          "qty_ref": 148,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.032387526375502323
+        },
+        {
+          "rank": 9,
+          "symbol": "TVSMOTOR",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/TVSMOTOR_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 3792.0,
+          "entry_rule": "next session open",
+          "target_price": 3892.87,
+          "stop_price": 3691.13,
+          "target_pct": 2.66,
+          "stop_pct": 2.66,
+          "max_hold_days": 5,
+          "qty_ref": 26,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.026601115129596155
+        },
+        {
+          "rank": 10,
+          "symbol": "ICICIBANK",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "Asian markets (+)",
+            "USD/INR (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/ICICIBANK_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1463.1,
+          "entry_rule": "next session open",
+          "target_price": 1489.29,
+          "stop_price": 1436.91,
+          "target_pct": 1.79,
+          "stop_pct": 1.79,
+          "max_hold_days": 5,
+          "qty_ref": 68,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.01789741937373677
+        }
+      ]
+    }
+  },
+  "top_pick": {
+    "rank": 1,
+    "symbol": "PAYTM",
+    "direction": "LONG",
+    "prob": 0.5,
+    "why": [
+      "Asian markets (+)",
+      "USD/INR (+)",
+      "US 10Y (-)"
+    ],
+    "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-21/PAYTM_swing_1_5d.png",
+    "actionable": false,
+    "ref_close": 1300.5,
+    "entry_rule": "next session open",
+    "target_price": 1348.89,
+    "stop_price": 1252.11,
+    "target_pct": 3.72,
+    "stop_pct": 3.72,
+    "max_hold_days": 5,
+    "qty_ref": 76,
+    "capital_ref_inr": 100000.0,
+    "atr_pct": 0.037210962816499174,
+    "horizon": "swing_1_5d",
+    "tier": "TOP_PICK",
+    "confidence_note": "rank #1 of the universe today by model score + momentum tie-break; calibrated P(win)=0.500 (below the 0.80 strong-signal bar). This is the day's RELATIVE best, not a high-confidence call \u2014 track the running hit rate before trusting it with capital."
+  },
+  "strong_signals": []
+}

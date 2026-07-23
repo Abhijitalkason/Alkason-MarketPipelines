@@ -1,0 +1,156 @@
+# Daily/Swing/Intraday Stock PREDICTION & LISTING system configuration.
+# Companion to config_v3.yaml (the intraday TRADING system). This config drives
+# src/daily/ only. It is loaded by src.daily.load_daily_config (separate cache),
+# never by src.intraday — so the frozen intraday "no edge" record stays intact.
+#
+# Product: predict + LIST a top-N watchlist per horizon (direction + calibrated
+# probability + a short "why"). No order execution. Staged gate: Milestone 1
+# ships the list on predictive quality; Milestone 2 adds an after-cost gate
+# before a list is framed as "actionable".
+
+live_data:                               # feature 2026-07-23 — optional Upstox intraday snapshot
+  enabled: false                         # OFF by default; pass --live or set true to run on a
+                                         # PROVISIONAL live bar instead of waiting for NSE EOD.
+                                         # Needs a valid UPSTOX_ACCESS_TOKEN (expires daily).
+  source: upstox                         # market-quote API — today's OHLC + current price + volume
+  # NOTE: a live snapshot is a preview only — the close is not final and flow
+  # features (delivery %, OI) don't exist intraday. See src/daily/live_snapshot.py.
+
+universe:
+  # PIT top-100 by trailing 6-month median turnover, regenerated monthly from the
+  # v6 panel (scripts/build_daily_universe.py). One row per (symbol, month).
+  membership_file: data/reference/universe_top100.csv
+  index_symbol: "TOP100_LIQUID"
+  min_median_daily_turnover_lacs: 100      # liquidity floor for listing eligibility
+
+data:
+  bhavcopy_path: data/bhavcopy             # source eq_*/fo_* (already on disk, daily)
+  daily_path: data/daily                   # built per-symbol daily panel <SYMBOL>.parquet
+  global_path: data/global                 # global/overnight/commodity/FX parquet
+  reference_path: data/reference           # macro_calendar.csv, monsoon.csv, events.csv
+  sentiment_path: data/sentiment           # Track B forward archive (raw + scored)
+  backfill_years: 3
+  max_skip_share: 0.05                     # dataset-thinning tolerance — raises
+  min_warmup_days: 60                      # trailing daily bars required before a row is built
+
+# Per-horizon geometry + cost profile. A horizon is a config block, not new code
+# (one labeler, one backtester). target/stop are in units of daily ATR fraction.
+horizons:
+  swing_1_5d:                              # PRIMARY — 1–5 day swing (user contract 2026-07-13)
+    enabled: true
+    path: daily_close
+    entry: next_open                       # fill at next session open
+    target_atr: 1.0                        # +1.0 daily ATR target
+    stop_atr: 1.0                          # −1.0 daily ATR stop (symmetric ⇒ 0.5 baseline)
+    time_barrier_days: 5                   # exit at close of the 5th session
+    embargo_days: 7                        # > horizon length (leakage trap)
+    costs_profile: delivery
+  next_day:                                # earlier experiment (M1 FAIL 2026-06-29/30)
+    enabled: false
+    path: daily_close
+    entry: next_open                       # fill at next session open
+    target_atr: 1.0
+    stop_atr: 1.0                          # symmetric ⇒ near sign(next-day return)
+    time_barrier_days: 1
+    embargo_days: 2                        # >= horizon length
+    costs_profile: delivery
+  swing_2_10d:
+    enabled: false                         # Phase 3
+    path: daily_close
+    entry: next_open
+    target_atr: 2.0
+    stop_atr: 2.0
+    time_barrier_days: 10
+    embargo_days: 12                       # >= horizon length (leakage trap)
+    costs_profile: delivery
+  intraday_open:                           # LOWEST priority — Phase 4, may not ship
+    enabled: false
+    path: one_min_open                     # 1-min path, open window only
+    entry: open
+    target_atr: 1.0
+    stop_atr: 1.0
+    time_barrier_hours: 2
+    embargo_days: 2
+    costs_profile: intraday
+
+features:
+  # Optional feature blocks toggle here. They stay in the FIXED schema regardless
+  # (absent data → value NaN imputed 0 alongside _present=0, exactly like intraday
+  # flow). Disabling only suppresses the read attempt; schema is unchanged.
+  fno_enabled: true                        # oi/basis present from 2024-01 on disk
+  global_enabled: true                     # reads data/global/* if present, else _present=0
+  macro_enabled: true                      # reads macro_calendar.csv if present
+  sentiment_enabled: false                 # Phase 5 — folds in once Track B accrues
+  max_global_missing_share: 1.0            # global is optional in v1 (no floor yet)
+  rsi_window: 14
+  atr_window: 14
+  vol_windows: [10, 20]
+  return_windows: [1, 3, 5, 10, 20]
+  ma_windows: [20, 50]
+  zscore_window: 20
+
+model:                                     # LightGBM (reuses price_model.py patterns)
+  n_estimators: 600
+  learning_rate: 0.03
+  num_leaves: 31
+  max_depth: 6
+  min_child_samples: 50
+
+training:
+  train_min_months: 12                     # daily rows are scarcer than intraday → relax 18→12
+  test_fold_months: 3
+  min_folds: 6                             # ≥6 OOS folds (same discipline as intraday)
+  embargo_days: 2                          # default; per-horizon override above
+  tune: false                              # Optuna on inner split when true (CI/measurement: false)
+  optuna_trials: 30
+  inner_calib_days: 60                     # day-boundary inner calibration tail
+  random_state: 42
+
+gate:                                      # STAGED success gate (the heart of the product)
+  milestone1:                              # PREDICTIVE — gates whether the list ships at all
+    min_auc: 0.52                          # OOS AUC meaningfully > 0.5 no-skill floor
+    min_auc_fold_consistency: 0.50         # share of folds that must clear 0.5
+    calibration_max_gap: 0.05              # |mean(p_cal) − mean(label)| in listed region
+    min_precision_at_n_lift: 1.05          # top-N hit rate ≥ 1.05× base rate
+    top_n: 10                              # the "few stocks" listed per day (matches listing.top_n)
+  milestone2:                              # AFTER-COST — gates the "actionable" label
+    min_expectancy_pct: 0.0                # net-of-cost expectancy ≥ 0 across folds
+    stress_multiplier: 2.0                 # also pass at 2× cost stress
+
+costs:                                     # delivery (overnight) + intraday profiles
+  # delivery (next_day/swing): STT 0.1% BOTH sides, exchange/SEBI/stamp/GST, DP on sell,
+  # NO slippage/impact (we do not model microstructure at daily fills).
+  brokerage_delivery_per_order_inr: 0      # discount-broker delivery brokerage (often 0)
+  stt_delivery_pct: 0.001                  # 0.1% on buy AND sell (delivery equity)
+  exchange_txn_pct: 0.0000297
+  sebi_fee_pct: 0.000001
+  stamp_buy_pct: 0.00015                   # 0.015% buy side (delivery)
+  gst_pct: 0.18
+  dp_charge_sell_inr: 15.0                 # flat DP/demat charge per sell scrip
+  # intraday profile delegates to src/intraday/costs.py (keeps slippage/impact).
+
+listing:
+  top_n: 10                                # picks per horizon in the daily list
+  why_top_k: 3                             # SHAP reasons attached per pick
+  charts: true
+  capital_per_pick_inr: 100000             # reference size for qty + cost math per pick
+  top_pick:                                # design update 2026-07-15 (user request): two-tier output
+    enabled: true                          # tier 2 — ALWAYS emit exactly 1 stock/day (rank #1),
+                                           # labelled with its TRUE calibrated probability; never
+                                           # dressed up as the strong signal
+    strong_signal_min_prob: 0.80           # tier 1 — the rare "speak up" bar (matches the frozen
+                                           # selective contract; expected to fire rarely/never
+                                           # until a model demonstrates real edge)
+
+api:
+  host: 0.0.0.0
+  port: 8001                               # distinct from intraday API (8000)
+  api_key_env: DAILY_API_KEY
+
+paths:
+  reports: reports/daily
+  charts: reports/daily/charts
+  lists: reports/daily/lists
+  signals_log: reports/daily/signals
+  run_registry: reports/daily/run_registry.csv
+  state: models/daily                      # model bundles, calibration, gate artifacts

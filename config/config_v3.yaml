@@ -144,3 +144,23 @@ paths:
   drift: reports/v3/drift
   run_registry: reports/v3/run_registry.csv
   state: models/v3                    # gate state, blend, models
+
+v6:                                   # PLAN_v6 §4.4 — delivery (CNC) cost stack; broker: Upstox (user decision 2026-07-08)
+  position_size_inr: 100000           # reference size for ALL gate arithmetic (§4.4; revisited at Gate 3 per the curve)
+  max_auction_participation_pct: 0.05 # cap vs PRE-OPEN AUCTION volume, not daily turnover (F18) [VERIFY per-symbol]
+  delivery_costs:                     # every constant cited — source: upstox.com/brokerage-charges [VERIFIED 2026-07-08]
+    brokerage_per_order_inr: 20       # equity delivery, flat ₹20 per executed order (buy and sell)
+    stt_pct: 0.001                    # STT 0.1% on buy AND sell (delivery; rate effective 2024-10-01)
+    exchange_txn_pct: 0.0000307       # NSE 0.00307% per side, effective 2026-03-01 (0.00297% during 2024-10→2026-02)
+    sebi_fee_pct: 0.000001            # ₹10/crore per side
+    stamp_buy_pct: 0.00015            # 0.015% buy side only
+    ipft_pct: 1.0e-9                  # NSE IPFT ₹0.01/crore per side (negligible; kept for completeness)
+    dp_sell_flat_inr: 20              # CDSL ₹3.5 + Upstox ₹16.5 per scrip per sell day, + GST
+    gst_pct: 0.18                     # on brokerage + exchange txn + IPFT + DP (per Upstox schedule; SEBI fee excluded there)
+    open_slippage_pct_per_side: 0.0005 # PROVISIONAL 5bps/side [MEASURE — §4.4/unknown #15: open vs first-15min VWAP study]
+    slippage_stress_multiplier: 2.0   # §4.3 2× stress lane
+  universe:                           # PLAN_v6 §4.1(b) — PIT liquidity universe (F20); moved from src/v6/universe.py hard-coded constants (review 2, F27)
+    top_n: 100                        # top-N by trailing 6-mo median turnover
+    lookback_months: 6
+    min_traded_share: 0.9             # must have traded >= 90% of trailing sessions
+    max_locked_share: 0.05            # circuit-lock proxy for surveillance exclusion (F15, unknown #12)
