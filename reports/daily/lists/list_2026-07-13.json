@@ -1,6 +1,6 @@
 {
   "date": "2026-07-13",
-  "generated": "2026-07-13T20:19:50",
+  "generated": "2026-07-15T10:08:23",
   "horizons": {
     "swing_1_5d": {
       "actionable": false,
@@ -14,7 +14,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\PAYTM_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/PAYTM_swing_1_5d.png",
           "actionable": false,
           "ref_close": 1386.5,
           "entry_rule": "next session open",
@@ -36,7 +36,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\CDSL_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/CDSL_swing_1_5d.png",
           "actionable": false,
           "ref_close": 1444.5,
           "entry_rule": "next session open",
@@ -58,7 +58,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\ETERNAL_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/ETERNAL_swing_1_5d.png",
           "actionable": false,
           "ref_close": 285.2,
           "entry_rule": "next session open",
@@ -80,7 +80,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\DIXON_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/DIXON_swing_1_5d.png",
           "actionable": false,
           "ref_close": 13490.0,
           "entry_rule": "next session open",
@@ -102,7 +102,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\DLF_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/DLF_swing_1_5d.png",
           "actionable": false,
           "ref_close": 682.35,
           "entry_rule": "next session open",
@@ -124,7 +124,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\COFORGE_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/COFORGE_swing_1_5d.png",
           "actionable": false,
           "ref_close": 1540.9,
           "entry_rule": "next session open",
@@ -146,7 +146,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\CHOLAFIN_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/CHOLAFIN_swing_1_5d.png",
           "actionable": false,
           "ref_close": 1810.9,
           "entry_rule": "next session open",
@@ -168,7 +168,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\HCLTECH_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/HCLTECH_swing_1_5d.png",
           "actionable": false,
           "ref_close": 1221.2,
           "entry_rule": "next session open",
@@ -190,7 +190,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\INDUSINDBK_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/INDUSINDBK_swing_1_5d.png",
           "actionable": false,
           "ref_close": 1012.9,
           "entry_rule": "next session open",
@@ -212,7 +212,7 @@
             "Asian markets (+)",
             "India VIX move (-)"
           ],
-          "chart_path": "C:\\Projects\\Alkason-MarketPipelines\\reports\\daily\\charts\\2026-07-13\\BAJFINANCE_swing_1_5d.png",
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-13/BAJFINANCE_swing_1_5d.png",
           "actionable": false,
           "ref_close": 1022.6,
           "entry_rule": "next session open",

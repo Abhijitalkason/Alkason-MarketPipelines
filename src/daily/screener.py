@@ -51,9 +51,15 @@ def _humanize(why: dict[str, float]) -> list[str]:
 
 
 def screen_day(day: date | None = None, horizon: str = "next_day",
-               top_n: int | None = None, df_panels: dict | None = None) -> pd.DataFrame:
+               top_n: int | None = None, df_panels: dict | None = None,
+               trace=None) -> pd.DataFrame:
     """Top-N daily picks for `horizon`. Returns columns
-    [symbol, p_up, direction, prob, why]. df_panels optionally injects panels (live)."""
+    [symbol, p_up, direction, prob, why]. df_panels optionally injects panels (live).
+
+    trace: optional callable(step, item, status, **detail) — when given (the
+    observable pipeline), every stock's indicator values, block presence and
+    calibrated score are journalled, and every skipped stock is journalled
+    with its reason (feature request 2026-07-17)."""
     cfg = load_daily_config()
     day = day or today_ist()
     top_n = top_n or cfg["listing"]["top_n"]
@@ -61,13 +67,36 @@ def screen_day(day: date | None = None, horizon: str = "next_day",
 
     pm, blender, meta = load_bundle(horizon)
     uni = load_universe(as_of=day)["symbol"].tolist()
+    if trace:
+        trace("universe", f"{len(uni)} stocks", "ok",
+              source=cfg["universe"]["membership_file"],
+              rule="PIT top-100 by trailing 6-month median daily turnover, "
+                   "refreshed monthly from the full NSE market (~2,400 symbols) — "
+                   "most-liquid names, point-in-time so no survivorship bias",
+              as_of=str(day), n=len(uni))
     plan = pd.DataFrame({"symbol": uni, "date": [day] * len(uni)})
     matrix = build_matrix(plan, df_panels=df_panels)
     if matrix.empty:
         logger.warning("daily screen %s %s: no feature rows", day, horizon)
+        if trace:
+            for sym in uni:
+                trace("score", sym, "skip", reason=f"no feature row for {day}")
         return pd.DataFrame(columns=["symbol", "p_up", "direction", "prob", "why"])
     check_schema(matrix)
     matrix = matrix.assign(p_up=blender.calibrated(pm.predict_proba(matrix)))
+
+    if trace:
+        from src.daily.trace import BLOCK_FLAGS, KEY_INDICATORS
+        scored = set(matrix["symbol"])
+        for sym in sorted(set(uni) - scored):
+            trace("score", sym, "skip",
+                  reason="no feature row (insufficient history / not traded / warmup)")
+        for _, r in matrix.iterrows():
+            trace("score", r["symbol"], "ok",
+                  p_win=round(float(r["p_up"]), 4),
+                  indicators={key: (round(float(r[key]), 4) if pd.notna(r.get(key)) else None)
+                              for key in KEY_INDICATORS if key in matrix.columns},
+                  blocks_present={b: bool(r.get(flag, 0)) for b, flag in BLOCK_FLAGS.items()})
 
     # Rank by calibrated P(win). At/near no-edge the model's scores tie (a constant
     # output is the honest no-signal answer), so break ties TRANSPARENTLY by trailing

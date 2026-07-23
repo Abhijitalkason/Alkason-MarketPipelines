@@ -1,0 +1,12 @@
+{
+  "date": "2026-07-17",
+  "generated": "2026-07-17T10:41:52",
+  "horizons": {
+    "swing_1_5d": {
+      "actionable": false,
+      "picks": []
+    }
+  },
+  "top_pick": null,
+  "strong_signals": []
+}

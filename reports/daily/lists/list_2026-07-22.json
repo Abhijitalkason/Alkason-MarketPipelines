@@ -1,0 +1,268 @@
+{
+  "date": "2026-07-22",
+  "generated": "2026-07-23T10:22:40",
+  "horizons": {
+    "swing_1_5d": {
+      "actionable": false,
+      "picks": [
+        {
+          "rank": 1,
+          "symbol": "PAYTM",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/PAYTM_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1267.0,
+          "entry_rule": "next session open",
+          "target_price": 1316.96,
+          "stop_price": 1217.04,
+          "target_pct": 3.94,
+          "stop_pct": 3.94,
+          "max_hold_days": 5,
+          "qty_ref": 78,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.039435111060999006
+        },
+        {
+          "rank": 2,
+          "symbol": "INDUSINDBK",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/INDUSINDBK_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1069.3,
+          "entry_rule": "next session open",
+          "target_price": 1097.05,
+          "stop_price": 1041.55,
+          "target_pct": 2.59,
+          "stop_pct": 2.59,
+          "max_hold_days": 5,
+          "qty_ref": 93,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.025948217124687718
+        },
+        {
+          "rank": 3,
+          "symbol": "DIXON",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/DIXON_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 13882.0,
+          "entry_rule": "next session open",
+          "target_price": 14407.86,
+          "stop_price": 13356.14,
+          "target_pct": 3.79,
+          "stop_pct": 3.79,
+          "max_hold_days": 5,
+          "qty_ref": 7,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03788050301520983
+        },
+        {
+          "rank": 4,
+          "symbol": "TVSMOTOR",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/TVSMOTOR_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 3907.6,
+          "entry_rule": "next session open",
+          "target_price": 4010.8,
+          "stop_price": 3804.4,
+          "target_pct": 2.64,
+          "stop_pct": 2.64,
+          "max_hold_days": 5,
+          "qty_ref": 25,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.02641007267888219
+        },
+        {
+          "rank": 5,
+          "symbol": "BAJAJ-AUTO",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/BAJAJ-AUTO_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 10998.5,
+          "entry_rule": "next session open",
+          "target_price": 11235.04,
+          "stop_price": 10761.96,
+          "target_pct": 2.15,
+          "stop_pct": 2.15,
+          "max_hold_days": 5,
+          "qty_ref": 9,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.021506179414075944
+        },
+        {
+          "rank": 6,
+          "symbol": "HCLTECH",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/HCLTECH_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1237.3,
+          "entry_rule": "next session open",
+          "target_price": 1277.74,
+          "stop_price": 1196.86,
+          "target_pct": 3.27,
+          "stop_pct": 3.27,
+          "max_hold_days": 5,
+          "qty_ref": 80,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.032686379328260844
+        },
+        {
+          "rank": 7,
+          "symbol": "ETERNAL",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/ETERNAL_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 284.4,
+          "entry_rule": "next session open",
+          "target_price": 293.44,
+          "stop_price": 275.36,
+          "target_pct": 3.18,
+          "stop_pct": 3.18,
+          "max_hold_days": 5,
+          "qty_ref": 351,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.031771147277476396
+        },
+        {
+          "rank": 8,
+          "symbol": "TITAN",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/TITAN_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 4711.6,
+          "entry_rule": "next session open",
+          "target_price": 4783.01,
+          "stop_price": 4640.19,
+          "target_pct": 1.52,
+          "stop_pct": 1.52,
+          "max_hold_days": 5,
+          "qty_ref": 21,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.015155603798527642
+        },
+        {
+          "rank": 9,
+          "symbol": "SWIGGY",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/SWIGGY_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 263.85,
+          "entry_rule": "next session open",
+          "target_price": 275.06,
+          "stop_price": 252.64,
+          "target_pct": 4.25,
+          "stop_pct": 4.25,
+          "max_hold_days": 5,
+          "qty_ref": 379,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.04248355396735159
+        },
+        {
+          "rank": 10,
+          "symbol": "BAJFINANCE",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "India VIX move (+)",
+            "USD index (+)",
+            "overnight Nasdaq (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/BAJFINANCE_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1060.3,
+          "entry_rule": "next session open",
+          "target_price": 1083.63,
+          "stop_price": 1036.97,
+          "target_pct": 2.2,
+          "stop_pct": 2.2,
+          "max_hold_days": 5,
+          "qty_ref": 94,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.02200185931205455
+        }
+      ]
+    }
+  },
+  "top_pick": {
+    "rank": 1,
+    "symbol": "PAYTM",
+    "direction": "LONG",
+    "prob": 0.5,
+    "why": [
+      "India VIX move (+)",
+      "USD index (+)",
+      "overnight Nasdaq (-)"
+    ],
+    "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-07-22/PAYTM_swing_1_5d.png",
+    "actionable": false,
+    "ref_close": 1267.0,
+    "entry_rule": "next session open",
+    "target_price": 1316.96,
+    "stop_price": 1217.04,
+    "target_pct": 3.94,
+    "stop_pct": 3.94,
+    "max_hold_days": 5,
+    "qty_ref": 78,
+    "capital_ref_inr": 100000.0,
+    "atr_pct": 0.039435111060999006,
+    "horizon": "swing_1_5d",
+    "tier": "TOP_PICK",
+    "confidence_note": "rank #1 of the universe today by model score + momentum tie-break; calibrated P(win)=0.500 (below the 0.80 strong-signal bar). This is the day's RELATIVE best, not a high-confidence call \u2014 track the running hit rate before trusting it with capital."
+  },
+  "strong_signals": []
+}

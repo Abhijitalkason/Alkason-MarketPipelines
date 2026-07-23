@@ -8,6 +8,14 @@
 # ships the list on predictive quality; Milestone 2 adds an after-cost gate
 # before a list is framed as "actionable".
 
+live_data:                               # feature 2026-07-23 — optional Upstox intraday snapshot
+  enabled: false                         # OFF by default; pass --live or set true to run on a
+                                         # PROVISIONAL live bar instead of waiting for NSE EOD.
+                                         # Needs a valid UPSTOX_ACCESS_TOKEN (expires daily).
+  source: upstox                         # market-quote API — today's OHLC + current price + volume
+  # NOTE: a live snapshot is a preview only — the close is not final and flow
+  # features (delivery %, OI) don't exist intraday. See src/daily/live_snapshot.py.
+
 universe:
   # PIT top-100 by trailing 6-month median turnover, regenerated monthly from the
   # v6 panel (scripts/build_daily_universe.py). One row per (symbol, month).
@@ -126,6 +134,13 @@ listing:
   why_top_k: 3                             # SHAP reasons attached per pick
   charts: true
   capital_per_pick_inr: 100000             # reference size for qty + cost math per pick
+  top_pick:                                # design update 2026-07-15 (user request): two-tier output
+    enabled: true                          # tier 2 — ALWAYS emit exactly 1 stock/day (rank #1),
+                                           # labelled with its TRUE calibrated probability; never
+                                           # dressed up as the strong signal
+    strong_signal_min_prob: 0.80           # tier 1 — the rare "speak up" bar (matches the frozen
+                                           # selective contract; expected to fire rarely/never
+                                           # until a model demonstrates real edge)
 
 api:
   host: 0.0.0.0

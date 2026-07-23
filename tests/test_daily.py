@@ -240,3 +240,38 @@ def test_earnings_release_ts_filtering(drepo, frozen_day):
     f2 = features_for_day("AAA", day, df_daily=panel)
     assert f2.iloc[0]["days_to_earnings_present"] == 1.0
     assert f2.iloc[0]["days_to_earnings"] == 5.0
+
+
+# ── two-tier top pick (design update 2026-07-15) ──────────────────────
+
+
+def _pick(symbol, prob, rank=1):
+    return {"rank": rank, "symbol": symbol, "direction": "LONG", "prob": prob,
+            "why": ["x (+)"], "actionable": False}
+
+
+def test_top_pick_is_rank_one_with_honest_note():
+    from src.daily.run_list import top_pick_block
+
+    picks = [_pick("AAA", 0.51), _pick("BBB", 0.50, rank=2)]
+    tp = top_pick_block(picks, "swing_1_5d", strong_min=0.80)
+    assert tp["symbol"] == "AAA" and tp["tier"] == "TOP_PICK"
+    assert tp["horizon"] == "swing_1_5d"
+    # the note must state the true probability and that the bar was NOT cleared
+    assert "0.510" in tp["confidence_note"]
+    assert "not a high-confidence call" in tp["confidence_note"]
+
+
+def test_top_pick_promotes_to_strong_signal_at_bar():
+    from src.daily.run_list import top_pick_block
+
+    tp = top_pick_block([_pick("AAA", 0.80)], "swing_1_5d", strong_min=0.80)
+    assert tp["tier"] == "STRONG_SIGNAL"
+    below = top_pick_block([_pick("AAA", 0.7999)], "swing_1_5d", strong_min=0.80)
+    assert below["tier"] == "TOP_PICK"
+
+
+def test_top_pick_none_on_empty_never_substitutes():
+    from src.daily.run_list import top_pick_block
+
+    assert top_pick_block([], "swing_1_5d", strong_min=0.80) is None

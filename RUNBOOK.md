@@ -98,6 +98,36 @@ python main.py --mode daily-list          # → reports/daily/lists/list_<today>
 ```
 The list decided on day T's close is FOR entry at T+1's open.
 
+## Two-tier output + background runner (design update 2026-07-15)
+The list now carries two tiers (config `listing.top_pick`):
+- **`top_pick`** — exactly ONE stock per day (rank #1 of the primary horizon),
+  always emitted, labelled with its true calibrated P(win) and an honest
+  confidence note. The day's *relative* best — track its hit rate via the
+  scoreboard (picks carry `rank`, so rank-1 filters cleanly) before trusting it.
+- **`strong_signals`** — any pick with calibrated P(win) ≥ 0.80 (the frozen
+  selective bar). Logged loudly + notified; expected rare/absent until a model
+  demonstrates measured edge. **Do not lower this bar** — that is how honest
+  systems become expensive ones.
+
+One-command evening run (fetch → global → panel → list → macOS notification):
+```
+./scripts/daily_pick.sh          # thin wrapper for: python main.py --mode daily-pipeline
+```
+**Pipeline observability (2026-07-17):** the run streams step-by-step status
+(state, per-step one-liners from live log capture, durations, result, log tail)
+to `reports/daily/pipeline_status.json` — visible in the UI's "AI/ML pipeline
+status" panel (http://localhost:8001/ui, auto-refreshes every 3s while running)
+or `GET /pipeline/status`. Derived states are honest: a run whose process died
+shows STOPPED (process died); alive but silent >90s shows STALLED. Run history
+accumulates in `reports/daily/pipeline_runs.jsonl`. If today's bhavcopy isn't
+published yet the pipeline falls back to the latest session on disk instead of
+emitting an empty list.
+To run automatically every trading evening, install the cron entry yourself
+(`crontab -e`; the tag comment makes it easy to find/remove):
+```cron
+30 19 * * 1-5  cd /Users/abhijitbharatkakade/AI-MLOps-Solution && ./scripts/daily_pick.sh >> reports/daily/pick_cron.log 2>&1  # alkason-daily-pick
+```
+
 ## Monthly (first weekend)
 ```
 python main.py --mode corp-actions        # refresh split/bonus factor table
@@ -130,6 +160,23 @@ Endpoints (all `X-API-Key`): `/health`, `/daily/list`, `/daily/list/history`,
 - The swing_1_5d list ships on the user's explicit 2026-07-13 instruction to
   run end-to-end regardless; the backtest report + `actionable` flag carry the
   measured truth. Check `reports/daily/run_registry.csv` before trusting picks.
+
+## Single-stock deep analyzer (feature 2026-07-16)
+Give it any NSE symbol → full background analysis (3y price history + technicals,
+delivery/F&O flow, yfinance fundamentals, 30-day news with links via GDELT,
+market regime, model view) → transparent BUY/HOLD/SELL evidence scorecard with
+end-to-end reasoning and reference links (NSE/Screener/Yahoo/TradingView/news).
+
+- **UI:** `python main.py --mode daily-serve` → open http://localhost:8001/ui
+  (paste `DAILY_API_KEY` from .env once; stored in the browser).
+- **CLI:** `python main.py --mode analyze --symbols RELIANCE`
+- **API:** `GET /analyze/{symbol}` · `GET /analyze/{symbol}/chart.png` ·
+  `GET /symbols` (all `X-API-Key`).
+- Honesty: every scorecard component carries value/weight/score/reason and a
+  `present` flag (missing data disclosed, never faked); news sentiment uses a
+  keyword lexicon until FinBERT (`pip install transformers torch`) is installed;
+  the verdict is rule-based evidence aggregation and every response carries the
+  no-proven-edge disclaimer. Verdict thresholds: BUY ≥ +0.25, SELL ≤ −0.25.
 
 ## Ranking note (2026-07-13)
 When the model has no measurable edge its calibrated probabilities tie at the

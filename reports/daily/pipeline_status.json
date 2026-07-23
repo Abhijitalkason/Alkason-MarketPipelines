@@ -1,0 +1,95 @@
+{
+ "job": "daily-pipeline",
+ "pid": 37966,
+ "state": "completed",
+ "started": "2026-07-23T10:22:32",
+ "updated": "2026-07-23T10:22:41",
+ "steps": [
+  {
+   "name": "fetch_bhavcopy",
+   "label": "Fetch NSE EOD (bhavcopy)",
+   "status": "done",
+   "one_liner": "partial \u2014 bhavcopy backfill: 1 non-holiday business days have NO files (first 10: [(datetime.date(2026, 7, 23), ['eq: HTTP 404 for https://nsearchives",
+   "started": "2026-07-23T10:22:32",
+   "seconds": 0.4
+  },
+  {
+   "name": "fetch_global",
+   "label": "Fetch global/macro series (yfinance)",
+   "status": "done",
+   "one_liner": "10 global series refreshed",
+   "started": "2026-07-23T10:22:33",
+   "seconds": 4.0
+  },
+  {
+   "name": "rebuild_panel",
+   "label": "Rebuild per-symbol daily panel",
+   "status": "done",
+   "one_liner": "100 symbols written",
+   "started": "2026-07-23T10:22:37",
+   "seconds": 2.1
+  },
+  {
+   "name": "generate_list",
+   "label": "Score universe \u2192 picks + top pick",
+   "status": "done",
+   "one_liner": "day 2026-07-22: top pick PAYTM P=0.500 \u00b7 0 strong signal(s)",
+   "started": "2026-07-23T10:22:39",
+   "seconds": 2.2
+  },
+  {
+   "name": "notify",
+   "label": "Desktop notification",
+   "status": "done",
+   "one_liner": "notification sent",
+   "started": "2026-07-23T10:22:41",
+   "seconds": 0.1
+  }
+ ],
+ "log_tail": [
+  "10:22:34 src.daily.global_data | global spx (^GSPC): 752 rows",
+  "10:22:34 src.daily.global_data | global ndx (^IXIC): 752 rows",
+  "10:22:34 src.daily.global_data | global dxy (DX-Y.NYB): 755 rows",
+  "10:22:35 src.daily.global_data | global us10y (^TNX): 752 rows",
+  "10:22:35 src.daily.global_data | global crude (CL=F): 755 rows",
+  "10:22:35 src.daily.global_data | global gold (GC=F): 755 rows",
+  "10:22:35 src.daily.global_data | global india_vix (^INDIAVIX): 734 rows",
+  "10:22:36 src.daily.global_data | global usdinr (INR=X): 779 rows",
+  "10:22:39 src.daily.panel | daily panel: 100 symbols written to /Users/abhijitbharatkakade/AI-MLOps-Solution/data/daily (2023-07-24..2026-07-23)",
+  "10:22:40 src.daily.features | daily features: 99 rows, present_share={'fno': 0.5858585858585857, 'global': 0.9090909090909088, 'macro': 0.0686868686868687, 'sentiment': 0.0}",
+  "10:22:41 src.daily.run_list | daily list 2026-07-22 swing_1_5d: 10 picks (actionable=False)"
+ ],
+ "result": {
+  "day": "2026-07-22",
+  "top_pick": {
+   "symbol": "PAYTM",
+   "direction": "LONG",
+   "prob": 0.5,
+   "tier": "TOP_PICK"
+  },
+  "n_picks": 10,
+  "n_strong_signals": 0,
+  "summary": {
+   "headline": "Session 2026-07-22: top pick PAYTM (LONG), 0 strong signal(s)",
+   "what_happened": [
+    "Today's (2026-07-23) NSE data is not published yet \u2014 analysed the last completed session (2026-07-22) instead.",
+    "Refreshed global/macro series (S&P, Nasdaq, crude, USD/INR, India VIX\u2026).",
+    "Rebuilt the daily price panel for the top-100 universe.",
+    "Scored all universe stocks with the swing model \u2192 ranked top 10 picks."
+   ],
+   "result_meaning": [
+    "TOP PICK = PAYTM (LONG) \u2014 rank #1 of the universe: the day's RELATIVE best, picked by model score + momentum tie-break.",
+    "Its calibrated P(win) is 0.500 vs the 0.80 strong-signal bar \u2192 NOT a high-confidence signal; the model's own gate marks it actionable=false.",
+    "Main drivers: India VIX move (+), USD index (+), overnight Nasdaq (-).",
+    "If traded anyway: entry next session open ~\u20b91267.0, target \u20b91316.96, stop \u20b91217.04, qty@\u20b91L 78, hold \u22645 days.",
+    "Strong signals fired: 0 (a macOS notification shouts if one ever does)."
+   ],
+   "next_steps": [
+    "NSE publishes today's data ~18:30 IST \u2014 press \u25b6 Start (or let the 19:30 cron run) after that to get the pick for the NEXT session's open.",
+    "To dig deeper: type PAYTM into the Analyzer (left) for full evidence, news and the 1\u20135 day trade plan.",
+    "Track the pick's honesty over time: python main.py --mode daily-scoreboard."
+   ]
+  }
+ },
+ "error": null
+}

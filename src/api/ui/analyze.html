@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NSE Stock Deep Analyzer</title>
+<style>
+  :root{--bg:#0d1117;--card:#161b22;--line:#30363d;--txt:#e6edf3;--dim:#8b949e;
+        --buy:#2ea043;--sell:#f85149;--hold:#d29922;--accent:#58a6ff}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--txt);font:15px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif;padding:24px}
+  .wrap{max-width:1440px;margin:0 auto}
+  .cols{display:flex;gap:16px;align-items:flex-start}
+  .col-main{flex:1.7;min-width:0}
+  .col-side{flex:1;min-width:340px;max-width:520px;position:sticky;top:12px}
+  @media(max-width:1000px){.cols{flex-direction:column}.col-side{position:static;max-width:none;width:100%}}
+  .btn2{background:#21262d;border:1px solid var(--line);color:var(--txt);border-radius:7px;
+        padding:5px 12px;font-size:12.5px;cursor:pointer;margin-left:6px}
+  .btn2:hover{border-color:var(--accent)} .btn2:disabled{opacity:.4;cursor:not-allowed}
+  .btn2.start{color:#3fb950;border-color:#2ea04366} .btn2.stop{color:#ff7b72;border-color:#f8514966}
+  /* pipeline stage tracker */
+  .pbanner{border-radius:9px;padding:12px 14px;margin:10px 0 14px;border:1px solid var(--line)}
+  .pbanner .big{font-size:16px;font-weight:700}
+  .pbanner .sm{font-size:12.5px;color:var(--dim);margin-top:2px}
+  .pbanner.idle{background:#161b22} .pbanner.running{background:#12233b;border-color:var(--accent)}
+  .pbanner.completed{background:#0f2417;border-color:#2ea04366}
+  .pbanner.failed,.pbanner.stopped,.pbanner.stopped_unexpectedly,.pbanner.stalled{background:#2a1416;border-color:#f8514966}
+  .pstep{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .pstep:last-child{border-bottom:0}
+  .pdot{flex:none;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
+        justify-content:center;font-size:13px;font-weight:800;border:2px solid var(--line);color:var(--dim)}
+  .pstep.done .pdot{background:#12351c;border-color:var(--buy);color:#3fb950}
+  .pstep.running .pdot{border-color:var(--accent);color:var(--accent);animation:pulse 1.1s infinite}
+  .pstep.failed .pdot{background:#3d1418;border-color:var(--sell);color:#ff7b72}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #58a6ff55}50%{box-shadow:0 0 0 5px #58a6ff00}}
+  .pstep .ptitle{font-size:14px;font-weight:600}
+  .pstep.running .ptitle{color:var(--accent)} .pstep.pending .ptitle{color:var(--dim)}
+  .pstep .pdesc{font-size:12px;color:var(--dim);margin-top:1px}
+  .pstep .plive{font-size:12.5px;margin-top:4px;color:var(--txt)}
+  .pstep.pending .plive{display:none}
+  .ptime{margin-left:auto;font-size:11.5px;color:var(--dim);flex:none}
+  h1{font-size:22px;margin-bottom:4px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:20px}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+  input{background:var(--card);border:1px solid var(--line);color:var(--txt);
+        border-radius:8px;padding:10px 14px;font-size:15px}
+  #symbol{flex:1;min-width:220px;text-transform:uppercase}
+  #apikey{width:260px}
+  button{background:var(--accent);border:0;color:#04101f;font-weight:700;
+         border-radius:8px;padding:10px 22px;font-size:15px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:wait}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:18px;margin-bottom:16px}
+  .verdict{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .badge{font-size:30px;font-weight:800;padding:10px 26px;border-radius:10px;color:#fff}
+  .BUY{background:var(--buy)} .SELL{background:var(--sell)} .HOLD{background:var(--hold);color:#1c1500}
+  .meta{color:var(--dim);font-size:13px}
+  h2{font-size:15px;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600}
+  .pos{color:var(--buy)} .neg{color:var(--sell)} .dim{color:var(--dim)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .kv{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px}
+  .kv .k{color:var(--dim);font-size:11.5px;text-transform:uppercase}
+  .kv .v{font-size:16px;font-weight:600;margin-top:2px}
+  .news{padding:8px 0;border-bottom:1px solid var(--line)}
+  .news a{color:var(--txt);text-decoration:none}
+  .news a:hover{color:var(--accent)}
+  .chip{font-size:11px;border-radius:20px;padding:2px 9px;margin-left:8px}
+  .chip.p{background:#12351c;color:#3fb950}.chip.n{background:#3d1418;color:#ff7b72}
+  .chip.z{background:#21262d;color:var(--dim)}
+  ol{padding-left:22px}  ol li{margin-bottom:6px}
+  .refs a{color:var(--accent);display:block;padding:3px 0;font-size:13.5px;text-decoration:none}
+  img{max-width:100%;border-radius:8px}
+  #err{color:var(--sell);margin-bottom:14px;white-space:pre-wrap}
+  .foot{color:var(--dim);font-size:12px;border-top:1px solid var(--line);padding-top:14px;margin-top:8px}
+  .spin{display:inline-block;width:18px;height:18px;border:3px solid var(--line);
+        border-top-color:var(--accent);border-radius:50%;animation:r 0.8s linear infinite;vertical-align:middle}
+  @keyframes r{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body><div class="wrap">
+  <h1>📊 NSE Stock Deep Analyzer</h1>
+  <div class="sub">Enter one NSE symbol → full background analysis: price history, technicals,
+    delivery flow, fundamentals, news (with links), market regime, model view → transparent
+    BUY / HOLD / SELL scorecard.</div>
+
+  <div class="bar">
+    <input id="symbol" list="symlist" placeholder="Stock symbol e.g. RELIANCE" autofocus>
+    <datalist id="symlist"></datalist>
+    <input id="apikey" type="password" placeholder="API key (X-API-Key)">
+    <button id="go" onclick="run()">Analyze</button>
+  </div>
+  <div class="cols">
+  <div class="col-main">
+  <div id="err"></div>
+  <div id="out" style="display:none">
+    <div class="card verdict">
+      <div class="badge" id="v-action">—</div>
+      <div>
+        <div style="font-size:19px;font-weight:700" id="v-name"></div>
+        <div class="meta" id="v-meta"></div>
+      </div>
+    </div>
+    <div class="card" id="plan-card" style="display:none"><h2>If you act on this — trade plan</h2>
+      <div class="grid" id="plan"></div>
+      <div class="meta" id="plan-notes" style="margin-top:10px"></div></div>
+    <div class="card"><h2>End-to-end reasoning</h2><ol id="reasoning"></ol></div>
+    <div class="card"><h2>Evidence scorecard</h2>
+      <table><thead><tr><th>Component</th><th>Weight</th><th>Score</th><th>Value</th><th>Reason</th></tr></thead>
+      <tbody id="scorecard"></tbody></table></div>
+    <div class="card"><h2>Price &amp; technicals</h2><div class="grid" id="tech"></div>
+      <div style="margin-top:14px"><img id="chart" alt=""></div></div>
+    <div class="card"><h2>Fundamentals</h2><div class="grid" id="fund"></div></div>
+    <div class="card"><h2>News (today / week / month) <span class="meta" id="news-meta"></span></h2>
+      <div id="news"></div></div>
+    <div class="card refs"><h2>Reference links</h2><div id="refs"></div></div>
+    <div class="foot" id="disclaimer"></div>
+  </div>
+  </div><!-- /col-main -->
+
+  <div class="col-side">
+  <div class="card" id="pipe-card">
+    <h2 style="margin-bottom:2px">⚙️ AI/ML pipeline</h2>
+    <div class="meta">Once a day, it studies the 100 most-traded NSE stocks and picks the single
+      best 1–5 day swing candidate. The 5 stages below show what it's doing.</div>
+
+    <div style="margin:12px 0 4px">
+      <button class="btn2 start" id="pipe-start" onclick="pipeStart()" style="margin-left:0">▶ Start (EOD)</button>
+      <button class="btn2 start" id="pipe-live" onclick="pipeStartLive()" title="Run now on a provisional Upstox intraday snapshot (needs a valid token)">⚡ Live (Upstox)</button>
+      <button class="btn2 stop" id="pipe-stop" onclick="pipeStop()" disabled>■ Stop</button>
+      <a class="btn2" href="/ui/trace" target="_blank" style="text-decoration:none">🔎 Details</a>
+      <span class="meta" id="pipe-msg" style="margin-left:6px"></span>
+    </div>
+
+    <div class="pbanner idle" id="pipe-banner">
+      <div class="big" id="pbanner-big">Idle — press ▶ Start new run</div>
+      <div class="sm" id="pbanner-sm"></div>
+    </div>
+
+    <div id="pipe-steps"></div>
+
+    <div id="pipe-meaning" style="margin-top:12px"></div>
+
+    <details style="margin-top:12px"><summary class="dim" style="cursor:pointer;font-size:12.5px">
+      🔧 Technical logs (live, for auditing) <span id="feed-state" class="meta"></span></summary>
+      <div id="feed" style="height:180px;overflow-y:auto;background:#0d1117;border:1px solid var(--line);
+           border-radius:7px;padding:8px 10px;margin-top:6px;font-family:ui-monospace,Menlo,monospace;
+           font-size:11px;line-height:1.5;color:var(--dim)"></div></details>
+    <details style="margin-top:4px"><summary class="dim" style="cursor:pointer;font-size:12.5px">Recent runs</summary>
+      <div id="pipe-history" class="meta" style="margin-top:6px"></div></details>
+  </div>
+  </div><!-- /col-side -->
+  </div><!-- /cols -->
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const KEY="analyzer_api_key";
+$("apikey").value=localStorage.getItem(KEY)||"";
+const hdr=()=>({"X-API-Key":$("apikey").value.trim()});
+fetchSymbols();
+async function fetchSymbols(){
+  try{const r=await fetch("/symbols",{headers:hdr()});
+    if(r.ok){(await r.json()).symbols.forEach(s=>{
+      const o=document.createElement("option");o.value=s;$("symlist").appendChild(o);});}}catch(e){}}
+$("symbol").addEventListener("keydown",e=>{if(e.key==="Enter")run()});
+function fmt(v){return v===null||v===undefined?"—":(typeof v==="number"?v.toLocaleString("en-IN"):v)}
+function pct(v){return v===null||v===undefined?"—":`${(v*100).toFixed(1)}%`}
+function kv(k,v,cls){return `<div class="kv"><div class="k">${k}</div><div class="v ${cls||""}">${v}</div></div>`}
+async function run(){
+  const sym=$("symbol").value.trim().toUpperCase();
+  if(!sym){$("err").textContent="Enter a symbol.";return}
+  localStorage.setItem(KEY,$("apikey").value.trim());
+  $("err").textContent="";$("go").disabled=true;$("go").innerHTML='<span class="spin"></span>';
+  try{
+    const r=await fetch(`/analyze/${sym}`,{headers:hdr()});
+    if(!r.ok){throw new Error(`${r.status}: ${(await r.text()).slice(0,300)}`)}
+    render(await r.json(),sym);
+  }catch(e){$("err").textContent="Analysis failed — "+e.message;$("out").style.display="none";}
+  $("go").disabled=false;$("go").textContent="Analyze";
+}
+function render(d,sym){
+  $("out").style.display="block";
+  const v=d.verdict;
+  $("v-action").textContent=v.action;$("v-action").className="badge "+v.action;
+  $("v-name").textContent=`${d.identity.name||sym} (${d.symbol})`;
+  $("v-meta").textContent=`score ${v.composite_score>0?"+":""}${v.composite_score} · confidence ${v.confidence} · `+
+    `evidence completeness ${(v.data_completeness*100).toFixed(0)}% · ${d.identity.sector||""} · `+
+    `${d.identity.sessions_on_disk} sessions · as of ${d.technicals.as_of}`;
+  const p=d.trade_plan;
+  if(p){
+    $("plan-card").style.display="block";
+    $("plan").innerHTML=
+      kv("Direction",p.direction)+kv("Entry",p.entry_rule.split(" — ")[0])+
+      kv("Ref close",fmt(p.ref_close))+kv("Stop (−1×ATR)",fmt(p.stop_price),"neg")+
+      kv("Target 1 (+1×ATR)",fmt(p.target_1),"pos")+kv("Target 2 (+2×ATR)",fmt(p.target_2),"pos")+
+      kv("Risk / share",fmt(p.risk_per_share))+kv("Holding period",`1–${p.max_hold_days} trading days`)+
+      kv("Qty @ ₹1L",fmt(p.qty_ref))+kv("Qty @ 1% risk",fmt(p.qty_if_risking_1pct))+
+      kv("Round-trip cost",p.round_trip_cost_pct+"%")+kv("ATR(14)",pct(p.atr_pct));
+    $("plan-notes").innerHTML=
+      `⏱ ${p.time_exit_rule}<br>🛑 ${p.stop_rule}<br>📏 ${p.sizing_note}<br>💸 ${p.cost_note}<br>⚖️ ${p.geometry_note}`;
+  } else { $("plan-card").style.display="none"; }
+  $("reasoning").innerHTML=d.reasoning.map(r=>`<li>${r}</li>`).join("");
+  $("scorecard").innerHTML=d.scorecard.map(r=>{
+    const c=r.score>0.05?"pos":r.score<-0.05?"neg":"dim";
+    return `<tr${r.present?"":' style="opacity:.45"'}><td>${r.component}</td><td>${r.weight}</td>`+
+      `<td class="${c}">${r.present?(r.score>0?"+":"")+r.score:"n/a"}</td>`+
+      `<td>${fmt(r.value)}</td><td>${r.reason}</td></tr>`}).join("");
+  const t=d.technicals;
+  $("tech").innerHTML=
+    kv("Close",fmt(t.close))+kv("1D",pct(t.ret_1d),t.ret_1d>0?"pos":"neg")+
+    kv("1W",pct(t.ret_1w),t.ret_1w>0?"pos":"neg")+kv("1M",pct(t.ret_1m),t.ret_1m>0?"pos":"neg")+
+    kv("3M",pct(t.ret_3m),t.ret_3m>0?"pos":"neg")+kv("1Y",pct(t.ret_1y),t.ret_1y>0?"pos":"neg")+
+    kv("RSI(14)",fmt(t.rsi14))+kv("ATR %",pct(t.atr_pct))+kv("52W position",pct(t.pos_52w))+
+    kv("52W high",fmt(t.high_52w))+kv("52W low",fmt(t.low_52w))+kv("Ann. vol",pct(t.ann_vol))+
+    kv("Max DD (1y)",pct(t.max_drawdown_1y),"neg")+kv("Vol vs 20d",fmt(t.vol_ratio_20)+"×")+
+    kv("SMA 20/50/200",`${fmt(t.sma20)} / ${fmt(t.sma50)} / ${fmt(t.sma200)}`);
+  const f=d.fundamentals;
+  $("fund").innerHTML=f.present?
+    kv("Market cap",fmt(f.market_cap_inr))+kv("P/E (ttm)",fmt(f.pe_trailing))+
+    kv("P/E (fwd)",fmt(f.pe_forward))+kv("P/B",fmt(f.price_to_book))+
+    kv("Div yield",fmt(f.dividend_yield))+kv("Beta",fmt(f.beta))+
+    kv("Analyst view",fmt(f.analyst_recommendation))+kv("Analyst target",fmt(f.analyst_target_mean))+
+    kv("# Analysts",fmt(f.analyst_count))
+    :`<div class="dim">${f.note||"unavailable"}</div>`;
+  const n=d.news;
+  $("news-meta").textContent=n.present?
+    ` — ${n.n_articles} articles (${n.n_today} today, ${n.n_week} this week) · mean sentiment ${n.mean_sentiment} · engine: ${n.engine}`:"";
+  $("news").innerHTML=n.present?n.articles.map(a=>{
+    const cls=a.sentiment>0.05?"p":a.sentiment<-0.05?"n":"z";
+    return `<div class="news"><a href="${a.url}" target="_blank" rel="noopener">${a.title}</a>`+
+      `<span class="chip ${cls}">${a.sentiment>0?"+":""}${a.sentiment}</span>`+
+      `<div class="meta">${a.domain||""} · ${a.date||""} · ${a.bucket}</div></div>`}).join("")
+    :`<div class="dim">${n.note||"no coverage found"}</div>`;
+  $("refs").innerHTML=d.references.map(r=>`<a href="${r.url}" target="_blank" rel="noopener">🔗 ${r.label}</a>`).join("");
+  $("disclaimer").textContent="⚠️ "+d.disclaimer;
+  loadChart(sym);
+}
+async function loadChart(sym){
+  $("chart").src="";
+  try{const r=await fetch(`/analyze/${sym}/chart.png`,{headers:hdr()});
+    if(r.ok)$("chart").src=URL.createObjectURL(await r.blob());}catch(e){}}
+
+// ── AI/ML pipeline stage tracker ─────────────────────────────────────
+// Each backend step, explained in plain English (always visible).
+const STEP_INFO={
+  fetch_bhavcopy:{n:1,title:"Get latest market data",
+    desc:"Downloads the most recent NSE closing prices for every stock."},
+  fetch_global:{n:2,title:"Check global markets",
+    desc:"Pulls world signals — US & Asia markets, crude oil, USD/INR, India VIX."},
+  rebuild_panel:{n:3,title:"Prepare stock histories",
+    desc:"Refreshes the recent price history of the top-100 traded stocks."},
+  generate_list:{n:4,title:"AI analysis & ranking",
+    desc:"The model reads ~40 signals per stock, scores each, ranks the best 1–5 day buy."},
+  notify:{n:5,title:"Finish & notify",
+    desc:"Saves the recommendation and sends a desktop alert."},
+};
+const BANNER={idle:"Idle — press ▶ Start new run",running:"🔄 Running…",
+  completed:"✅ Completed",failed:"❌ Failed",stopped:"■ Stopped by you",
+  stopped_unexpectedly:"❌ Stopped (the process died)",stalled:"⚠ Stalled (no update)"};
+let pipeTimer=null, liveCounts={};
+
+async function loadPipeline(manual){
+  if(pipeTimer){clearTimeout(pipeTimer);pipeTimer=null;}
+  try{
+    const r=await fetch("/pipeline/status",{headers:hdr()});
+    if(!r.ok){$("pipe-msg").textContent=manual?`check API key (${r.status})`:"";return;}
+    const d=await r.json(); renderPipeline(d);
+    const st=d.current&&d.current.derived_state;
+    pipeTimer=setTimeout(loadPipeline, st==="running"?3000:30000);
+  }catch(e){$("pipe-msg").textContent="server offline";}
+}
+async function pipePost(path){
+  $("pipe-msg").textContent="…";
+  try{
+    const r=await fetch(path,{method:"POST",headers:hdr()});
+    const b=await r.json().catch(()=>({}));
+    $("pipe-msg").textContent=r.ok?"":(b.detail||`HTTP ${r.status}`);
+    if(r.ok){liveCounts={}; setTimeout(()=>loadPipeline(true),800);}
+  }catch(e){$("pipe-msg").textContent="request failed";}
+}
+function pipeStart(){pipePost("/pipeline/run")}
+function pipeStartLive(){
+  if(confirm("Run on a LIVE Upstox snapshot?\n\nThis is a PREVIEW: prices are current (not the "+
+    "final close) and delivery/OI features are missing. Needs a valid Upstox token."))
+    pipePost("/pipeline/run?live=true");
+}
+function pipeStop(){if(confirm("Stop the running pipeline?"))pipePost("/pipeline/stop")}
+function setLive(name,text){
+  liveCounts[name]=text;
+  const el=$("plive-"+name); if(el)el.textContent="→ "+text;
+}
+function renderPipeline(d){
+  const c=d.current;
+  const state=c?c.derived_state:"idle";
+  const running=state==="running";
+  $("pipe-start").disabled=running;
+  $("pipe-start").textContent=(!c||running)?"▶ Start new run":"⟳ Start new run";
+  $("pipe-stop").disabled=!running;
+
+  // headline banner — plain state + the answer when done
+  const bn=$("pipe-banner"); bn.className="pbanner "+(BANNER[state]?state:"idle");
+  let big=BANNER[state]||"Idle", sm="";
+  if(c&&running){
+    const done=c.steps.filter(s=>s.status==="done").length;
+    const cur=c.steps.find(s=>s.status==="running");
+    big=`🔄 Running — step ${Math.min(done+1,c.steps.length)} of ${c.steps.length}`;
+    sm=cur?(STEP_INFO[cur.name]?STEP_INFO[cur.name].title:cur.label)+"…":"";
+  }else if(c&&state==="completed"&&c.result){
+    const tp=c.result.top_pick;
+    big=tp?`✅ Done — top pick ${tp.symbol} (P=${tp.prob})`:"✅ Done — no pick produced";
+    sm=`for the session of ${c.result.day} · ${c.result.n_strong_signals} strong signal(s)`;
+  }else if(c&&c.error){ sm=c.error.slice(0,140); }
+  $("pbanner-big").textContent=big; $("pbanner-sm").textContent=sm;
+
+  // the five stage cards
+  if(!c){
+    $("pipe-steps").innerHTML=Object.entries(STEP_INFO).map(([name,i])=>
+      `<div class="pstep pending"><div class="pdot">${i.n}</div><div style="flex:1">
+        <div class="ptitle">${i.title}</div><div class="pdesc">${i.desc}</div></div></div>`).join("");
+  }else{
+    $("pipe-steps").innerHTML=c.steps.map(s=>{
+      const i=STEP_INFO[s.name]||{n:"•",title:s.label,desc:""};
+      const cls=s.status==="done"?"done":s.status==="failed"?"failed":s.status==="running"?"running":"pending";
+      const dot=s.status==="done"?"✓":s.status==="failed"?"✕":i.n;
+      const time=s.seconds!=null?s.seconds+"s":(s.status==="running"?"…":"");
+      // while running show the live counter; once done prefer the final one-liner
+      const live=(s.status==="done"||s.status==="failed")?(s.one_liner||""):(liveCounts[s.name]||s.one_liner||"");
+      return `<div class="pstep ${cls}"><div class="pdot">${dot}</div>
+        <div style="flex:1;min-width:0">
+          <div class="ptitle">${i.title}</div>
+          <div class="pdesc">${i.desc}</div>
+          <div class="plive" id="plive-${s.name}">${live?"→ "+live:""}</div>
+        </div><div class="ptime">${time}</div></div>`;
+    }).join("");
+  }
+
+  // plain-English meaning, only when a run has completed with a summary
+  const res=c&&c.result;
+  if(res&&res.summary&&state==="completed"){
+    const s=res.summary;
+    const sec=(t,items)=>items&&items.length?`<div style="margin-top:8px">
+      <b style="color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.04em">${t}</b>
+      <ul style="margin:4px 0 0 18px;padding:0;font-size:13px">`+
+      items.map(x=>`<li style="margin-bottom:3px">${x}</li>`).join("")+"</ul></div>":"";
+    $("pipe-meaning").innerHTML=`<div class="card" style="margin:0;padding:12px 14px;background:#0d1117">`+
+      sec("What it means",s.result_meaning)+sec("What's next",s.next_steps)+`</div>`;
+  }else{ $("pipe-meaning").innerHTML=""; }
+
+  $("pipe-history").innerHTML=(d.history||[]).map(h=>{
+    const tp=h.result&&h.result.top_pick;
+    return `<div>${(h.started||"").replace("T"," ")} — <b>${h.state}</b>`+
+      `${tp?" → "+tp.symbol+" P="+tp.prob:""}${h.error?" ("+h.error.slice(0,50)+")":""}</div>`;
+  }).join("")||"<div class='dim'>none</div>";
+}
+loadPipeline();
+
+// ── LIVE activity stream (feature 2026-07-22) ────────────────────────
+function feedLine(html,cls){
+  const box=$("feed");
+  const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<40;
+  const div=document.createElement("div");
+  if(cls)div.style.color=cls;
+  div.innerHTML=html;
+  box.appendChild(div);
+  while(box.children.length>500)box.removeChild(box.firstChild);
+  if(atBottom)box.scrollTop=box.scrollHeight;
+}
+function fmtTrace(e){
+  const t=e.ts?`<span style="opacity:.55">${e.ts}</span> `:"";
+  if(e.step==="_meta")return t+"🚀 run journal opened";
+  if(e.step==="universe")return t+`🗂 ${e.item} selected — ${(e.rule||"").slice(0,80)}…`;
+  if(e.step==="fetch_bhavcopy")return t+(e.status==="ok"
+    ?`📥 NSE EOD ${e.item} — received (${e.detail||""})`
+    :`📥 NSE EOD ${e.item} — <span style="color:var(--hold)">partial/skip</span>: ${(e.error||"").slice(0,90)}`);
+  if(e.step==="fetch_global")return t+`🌏 ${e.item} — received ${e.rows||0} rows (${e.source||""})`;
+  if(e.step==="panel")return t+`🧱 panel ${e.item} — ${e.rows} rows rebuilt`;
+  if(e.step==="score")return e.status==="ok"
+    ?t+`🧮 scored <b style="color:var(--txt)">${e.item}</b> — P(win)=${e.p_win}`
+    :t+`⏭ ${e.item} skipped — ${e.reason||""}`;
+  if(e.step==="rank")return t+`🏅 rank #${e.rank}: <b style="color:var(--txt)">${e.item}</b> `+
+    `P=${e.prob} tgt=${e.target} stop=${e.stop}`;
+  if(e.step==="generate_list")return t+`ℹ️ ${e.reason||e.item}`;
+  return t+`${e.step} ${e.item} ${e.status}`;
+}
+// translate raw trace events into plain per-stage live counters
+let gN=0,pN=0,sN=0;
+function liveFromTrace(e){
+  const st=e.step;
+  if(st==="_meta"){liveCounts={};gN=pN=sN=0;}
+  else if(st==="fetch_bhavcopy")setLive("fetch_bhavcopy",
+    e.status==="ok"?"market data received ✓":"today's file not out yet — using the latest available session");
+  else if(st==="fetch_global"){gN++;setLive("fetch_global",`checking world markets… ${gN} of 10 received`);}
+  else if(st==="panel"){pN++;setLive("rebuild_panel",`updating stock histories… ${pN} of ~100 done`);}
+  else if(st==="universe")setLive("generate_list",`selected ${e.item} to analyse`);
+  else if(st==="score"){sN++;setLive("generate_list",`AI scoring stocks… ${sN} scored`);}
+  else if(st==="rank"&&e.rank===1)setLive("generate_list",`ranking done — leader ${e.item} (P=${e.prob})`);
+}
+async function connectFeed(){
+  $("feed-state").textContent="connecting…";
+  try{
+    const resp=await fetch("/pipeline/stream",{headers:hdr()});
+    if(!resp.ok){$("feed-state").textContent=`auth? (HTTP ${resp.status})`;setTimeout(connectFeed,5000);return;}
+    $("feed-state").textContent="streaming";
+    const reader=resp.body.getReader();
+    const dec=new TextDecoder();let buf="";
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split("\n");buf=lines.pop();
+      for(const ln of lines){
+        if(!ln.trim())continue;
+        let e;try{e=JSON.parse(ln)}catch(_){continue}
+        if(e.kind==="trace"){ feedLine(fmtTrace(e)); liveFromTrace(e); }
+        else if(e.kind==="step")feedLine(`<b style="color:var(--accent)">${e.msg}</b>`);
+        else if(e.kind==="state"){feedLine(`<b style="color:var(--txt)">${e.msg}</b>`);loadPipeline(true);}
+        else if(e.kind==="info"){ feedLine(e.msg,"var(--dim)"); if(/new run/i.test(e.msg)){liveCounts={};gN=pN=sN=0;} }
+        else feedLine(e.msg,"var(--dim)");
+      }
+    }
+  }catch(err){/* fall through to reconnect */}
+  $("feed-state").textContent="disconnected — retrying…";
+  setTimeout(connectFeed,3000);
+}
+connectFeed();
+</script>
+</body></html>
