@@ -12,7 +12,8 @@ Labels are computed LONG-only and direction-agnostic; the backtester applies the
 predicted direction sign. Conservative tie-break: a daily bar touching BOTH
 barriers counts as the stop (pessimistic, matches intraday).
 
-next_day is just H=1 (the degenerate 1-step triple barrier — the primary horizon).
+The primary horizon is swing_1_5d (H=5); a horizon is fully defined by its
+config block (target/stop ATR + time_barrier_days), so no code changes per horizon.
 """
 
 from __future__ import annotations
@@ -60,14 +61,14 @@ def _resolve_daily_path(path: pd.DataFrame, entry: float, target: float,
     return path.index[-1], float(last.close), "time"
 
 
-def label_day(symbol: str, day: date, horizon: str = "next_day",
+def label_day(symbol: str, day: date, horizon: str = "swing_1_5d",
               df_daily: pd.DataFrame | None = None) -> DailyOutcome | None:
     """Triple-barrier outcome for one (symbol, decision day) — thin wrapper over
     label_symbol. Returns None when there is no entry bar / insufficient history."""
     return label_symbol(symbol, [day], horizon, df_daily=df_daily).get(day)
 
 
-def label_symbol(symbol: str, days, horizon: str = "next_day",
+def label_symbol(symbol: str, days, horizon: str = "swing_1_5d",
                  df_daily: pd.DataFrame | None = None) -> dict:
     """Triple-barrier outcomes for many decision days in one pass (ATR computed
     once over the full series; trailing, so no lookahead). Returns {day: outcome}.
@@ -112,7 +113,7 @@ def outcomes_frame(outcomes: list[DailyOutcome]) -> pd.DataFrame:
     return pd.DataFrame([o.__dict__ for o in outcomes if o is not None])
 
 
-def geometric_baseline(horizon: str = "next_day") -> float:
+def geometric_baseline(horizon: str = "swing_1_5d") -> float:
     """stop_atr / (target_atr + stop_atr) — the no-edge win-rate floor for the
     horizon's geometry (symmetric ⇒ 0.5)."""
     hc = horizon_config(horizon)

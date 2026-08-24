@@ -91,7 +91,7 @@ async def daily_list_history(days: int = 30):
 
 
 @app.get("/daily/scoreboard", dependencies=[Depends(require_key)])
-async def scoreboard(horizon: str = "next_day", source: str = "oos"):
+async def scoreboard(horizon: str = "swing_1_5d", source: str = "oos"):
     """How the model's picks actually do. source=oos → at-scale lookahead-free
     backtest record; source=live → the running day-by-day forward scoreboard."""
     from src.daily.evaluate import scoreboard as live_scoreboard
@@ -103,7 +103,7 @@ async def scoreboard(horizon: str = "next_day", source: str = "oos"):
 
 
 @app.get("/daily/chart/{symbol}", dependencies=[Depends(require_key)])
-async def daily_chart(symbol: str, horizon: str = "next_day", day: str | None = None):
+async def daily_chart(symbol: str, horizon: str = "swing_1_5d", day: str | None = None):
     d = day or today_ist().isoformat()
     path = daily_path("charts") / d / f"{symbol}_{horizon}.png"
     if not path.exists():

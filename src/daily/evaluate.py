@@ -48,7 +48,7 @@ def _agg(picks: pd.DataFrame, base_rate: float) -> dict:
 
 # ── at-scale, lookahead-free (from a backtest OOS artifact) ────────────
 
-def scoreboard_from_oos(horizon: str = "next_day", top_n: int | None = None,
+def scoreboard_from_oos(horizon: str = "swing_1_5d", top_n: int | None = None,
                         capital_per_trade_inr: float = 100_000) -> dict:
     """Build the predict-vs-actual scoreboard from the most recent OOS artifact.
     Each OOS row is a real out-of-sample prediction (p_cal) paired with what the
@@ -102,7 +102,7 @@ def _universe_base_rate(day: date, horizon: str) -> float:
 
 # ── live, day-by-day (score a saved list once it matures) ──────────────
 
-def evaluate_day(day: date, horizon: str = "next_day",
+def evaluate_day(day: date, horizon: str = "swing_1_5d",
                  capital_per_trade_inr: float = 100_000) -> dict:
     """Score the saved list for `day` against realized outcomes. 'Matured' means the
     predicted session has closed and is on the daily panel; otherwise status
@@ -161,7 +161,7 @@ def _append_scoreboard(result: dict, horizon: str) -> None:
     pd.DataFrame([line]).to_csv(reg, mode="a", header=not reg.exists(), index=False)
 
 
-def scoreboard(horizon: str = "next_day") -> dict:
+def scoreboard(horizon: str = "swing_1_5d") -> dict:
     """Aggregate the running live scoreboard (all matured evals to date)."""
     reg = daily_path("reports") / f"scoreboard_{horizon}.csv"
     if not reg.exists():

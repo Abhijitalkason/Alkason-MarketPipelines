@@ -143,17 +143,17 @@ def test_schema_check_catches_missing(drepo, frozen_day):
 def test_cost_profiles(drepo):
     from src.daily.costs import round_trip_cost_pct
 
-    deliv = round_trip_cost_pct("next_day", price=1000.0, qty=100)
+    deliv = round_trip_cost_pct("swing_1_5d", price=1000.0, qty=100)
     assert 0 < deliv < 0.01                       # delivery stack is cheap, no slippage
-    deliv_stress = round_trip_cost_pct("next_day", price=1000.0, qty=100, stress=True)
+    deliv_stress = round_trip_cost_pct("swing_1_5d", price=1000.0, qty=100, stress=True)
     assert deliv_stress > deliv
 
 
-def test_label_day_next_day(drepo, frozen_day):
+def test_label_day_swing(drepo, frozen_day):
     from src.daily.labeler import label_day
 
     panel = pd.read_parquet(drepo["root"] / "data" / "daily" / "AAA.parquet")
-    out = label_day("AAA", frozen_day, "next_day", df_daily=panel)
+    out = label_day("AAA", frozen_day, "swing_1_5d", df_daily=panel)
     assert out is not None
     assert out.label in (0, 1)
     assert out.barrier in ("target", "stop", "time")
@@ -165,8 +165,8 @@ def test_staged_gate_pipeline(drepo):
     We assert structure + that the gate RAN, not that it passed (honest)."""
     from src.daily.backtester import run_backtest
 
-    rep = run_backtest(date(2023, 1, 2), date(2024, 12, 31), horizon="next_day")
-    assert rep["horizon"] == "next_day"
+    rep = run_backtest(date(2023, 1, 2), date(2024, 12, 31), horizon="swing_1_5d")
+    assert rep["horizon"] == "swing_1_5d"
     assert rep["n_folds"] >= 4
     m1, m2 = rep["milestone1_predictive"], rep["milestone2_after_cost"]
     assert 0.0 <= m1["oos_auc"] <= 1.0
@@ -179,7 +179,7 @@ def test_staged_gate_pipeline(drepo):
 
     # the at-scale scoreboard reads the OOS artifact this run wrote
     from src.daily.evaluate import scoreboard_from_oos
-    sb = scoreboard_from_oos("next_day")
+    sb = scoreboard_from_oos("swing_1_5d")
     assert sb["n_picks"] > 0 and sb["n_days"] > 0
     assert 0.0 <= sb["hit_rate"] <= 1.0
     assert "edge_vs_base" in sb and "mean_return_net" in sb
@@ -193,16 +193,17 @@ def test_live_predict_then_evaluate(drepo):
     from src.daily.run_list import run
     from src.daily.trainer import train_production
 
-    train_production(horizon="next_day", end_day=date(2024, 12, 18))
-    pred_day = date(2024, 12, 24)                 # after the train cutoff; 12-26/27 mature it
-    run(day=pred_day, horizons=["next_day"])
-    res = evaluate_day(pred_day, horizon="next_day")
+    train_production(horizon="swing_1_5d", end_day=date(2024, 12, 18))
+    pred_day = date(2024, 12, 24)                 # after the train cutoff; the 5-session
+                                                  # swing window (12-25..12-31) matures it
+    run(day=pred_day, horizons=["swing_1_5d"])
+    res = evaluate_day(pred_day, horizon="swing_1_5d")
     assert res["status"] == "matured"
     assert res["n_picks"] >= 1
     assert 0.0 <= res["hit_rate"] <= 1.0
     for p in res["picks"]:
         assert p["actual_up"] in (0, 1) and "actual_return" in p
-    sb = scoreboard("next_day")                   # running live scoreboard accrued one day
+    sb = scoreboard("swing_1_5d")                 # running live scoreboard accrued one day
     assert sb["n_days"] == 1
     # base rate is the universe-wide up-rate (not the picks' own), so edge_vs_base is meaningful
     assert 0.0 <= res["base_up_rate"] <= 1.0

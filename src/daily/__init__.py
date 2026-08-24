@@ -56,7 +56,7 @@ def daily_path(key: str) -> Path:
 
 
 def horizon_config(name: str) -> dict:
-    """The config block for one horizon (next_day | swing_2_10d | intraday_open)."""
+    """The config block for one horizon (swing_1_5d | swing_2_10d | intraday_open)."""
     horizons = load_daily_config()["horizons"]
     if name not in horizons:
         raise KeyError(f"unknown horizon {name!r}; known: {list(horizons)}")

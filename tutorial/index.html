@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Gate, Not the Model — A Deep MLOps Tutorial</title>
+<meta name="description" content="An in-depth, end-to-end tutorial on AI MLOps — basics to internals — taught through a real NSE stock-signal system that was honestly killed at a pre-registered feasibility gate. Real code, interactive visualizations, glossary." />
+<style>
+/* ============================================================
+   DESIGN TOKENS — "The Quant's Instrument Panel"
+   Accent = amber gauge-needle (the one bold hue).
+   Semantic win/loss (teal / brick) are DATA colors, not the accent.
+   ============================================================ */
+:root{
+  --bg:#eceef1; --surface:#ffffff; --surface-2:#f5f7f9; --surface-3:#eef1f4;
+  --border:#d7dce3; --border-strong:#c2c9d2;
+  --ink:#171b22; --ink-soft:#3c4652; --muted:#69727e;
+  --accent:#a9760d; --accent-bright:#c68c14; --accent-soft:#f4e8cb; --accent-line:#e7d19a;
+  --win:#1c8a62; --win-soft:#d8efe4;
+  --loss:#bb443c; --loss-soft:#f6ddd9;
+  --info:#2f6f9e; --info-soft:#dcecf6;
+  --shadow: 0 1px 2px rgba(20,28,40,.06), 0 12px 34px -18px rgba(20,28,40,.30);
+  --font-display:"SF Pro Display","Helvetica Neue",-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+  --font-body:-apple-system,system-ui,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --font-mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  --maxw:830px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1319; --surface:#161c26; --surface-2:#1b232f; --surface-3:#212b39;
+    --border:#28323f; --border-strong:#38455a;
+    --ink:#e8ebf0; --ink-soft:#b7c0cd; --muted:#7e8a9a;
+    --accent:#e0a331; --accent-bright:#f2b64a; --accent-soft:#2a2415; --accent-line:#4a3d1c;
+    --win:#39b184; --win-soft:#16241f;
+    --loss:#db655b; --loss-soft:#2a1917;
+    --info:#5aa2d6; --info-soft:#132430;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 18px 44px -22px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#eceef1; --surface:#ffffff; --surface-2:#f5f7f9; --surface-3:#eef1f4;
+  --border:#d7dce3; --border-strong:#c2c9d2;
+  --ink:#171b22; --ink-soft:#3c4652; --muted:#69727e;
+  --accent:#a9760d; --accent-bright:#c68c14; --accent-soft:#f4e8cb; --accent-line:#e7d19a;
+  --win:#1c8a62; --win-soft:#d8efe4; --loss:#bb443c; --loss-soft:#f6ddd9;
+  --info:#2f6f9e; --info-soft:#dcecf6;
+  --shadow: 0 1px 2px rgba(20,28,40,.06), 0 12px 34px -18px rgba(20,28,40,.30);
+}
+:root[data-theme="dark"]{
+  --bg:#0f1319; --surface:#161c26; --surface-2:#1b232f; --surface-3:#212b39;
+  --border:#28323f; --border-strong:#38455a;
+  --ink:#e8ebf0; --ink-soft:#b7c0cd; --muted:#7e8a9a;
+  --accent:#e0a331; --accent-bright:#f2b64a; --accent-soft:#2a2415; --accent-line:#4a3d1c;
+  --win:#39b184; --win-soft:#16241f; --loss:#db655b; --loss-soft:#2a1917;
+  --info:#5aa2d6; --info-soft:#132430;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 18px 44px -22px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:17px; line-height:1.7;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
+::selection{background:var(--accent-soft); color:var(--ink)}
+a{color:var(--accent); text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2.5px solid var(--accent-bright); outline-offset:3px; border-radius:4px}
+
+#progress{position:fixed; top:0; left:0; height:3px; width:0%;
+  background:linear-gradient(90deg,var(--accent),var(--accent-bright)); z-index:60; transition:width .1s linear}
+
+/* ============ LAYOUT ============ */
+.shell{display:grid; grid-template-columns:300px minmax(0,1fr); max-width:1340px; margin:0 auto}
+.rail{position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+  border-right:1px solid var(--border); background:var(--surface); padding:26px 20px; display:flex; flex-direction:column; gap:18px}
+.brand{display:flex; flex-direction:column; gap:6px}
+.brand .tag{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--accent)}
+.brand h1{font-family:var(--font-display); font-size:19px; font-weight:800; letter-spacing:-.01em; margin:0; line-height:1.2}
+.brand .sub{font-size:12.5px; color:var(--muted)}
+.toc{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:1px}
+.toc a{display:flex; gap:9px; align-items:baseline; padding:6px 9px; border-radius:7px;
+  color:var(--ink-soft); font-size:13px; line-height:1.3; border-left:2px solid transparent}
+.toc a .n{font-family:var(--font-mono); font-size:10.5px; color:var(--muted); min-width:18px}
+.toc a:hover{background:var(--surface-2); text-decoration:none; color:var(--ink)}
+.toc a.active{background:var(--accent-soft); color:var(--ink); border-left-color:var(--accent); font-weight:600}
+.toc a.active .n{color:var(--accent)}
+.railfoot{margin-top:auto; display:flex; flex-direction:column; gap:10px; padding-top:10px}
+.railbtns{display:flex; gap:8px; flex-wrap:wrap}
+.themebtn{display:inline-flex; align-items:center; gap:7px; border:1px solid var(--border-strong); background:var(--surface-2);
+  color:var(--ink-soft); font-family:var(--font-mono); font-size:11px; letter-spacing:.03em; padding:6px 11px; border-radius:20px; cursor:pointer}
+.themebtn:hover{border-color:var(--accent); color:var(--ink)}
+.railnote{font-size:10.5px; color:var(--muted); line-height:1.55}
+
+main{min-width:0; padding:0 clamp(20px,5vw,64px)}
+section{padding:70px 0; border-top:1px solid var(--border); scroll-margin-top:16px}
+section:first-of-type{border-top:none}
+.wrap{max-width:var(--maxw)}
+
+.eyebrow{font-family:var(--font-mono); font-size:11.5px; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--accent); display:flex; align-items:center; gap:12px; margin-bottom:18px}
+.eyebrow::before{content:""; width:26px; height:1.5px; background:var(--accent); display:inline-block}
+h2{font-family:var(--font-display); font-weight:800; letter-spacing:-.02em; line-height:1.08;
+  font-size:clamp(1.8rem,3.5vw,2.5rem); margin:0 0 18px; text-wrap:balance}
+h3{font-family:var(--font-display); font-weight:700; letter-spacing:-.01em; font-size:1.26rem; margin:34px 0 12px}
+h4{font-size:1rem; margin:22px 0 8px; letter-spacing:-.01em}
+p{margin:0 0 18px; color:var(--ink-soft); max-width:68ch}
+strong{color:var(--ink); font-weight:650}
+.lead{font-size:1.15rem; color:var(--ink); line-height:1.6}
+ul,ol{color:var(--ink-soft); padding-left:1.25em; margin:0 0 18px; max-width:66ch}
+li{margin:.4em 0} li::marker{color:var(--accent)}
+.mono{font-family:var(--font-mono)}
+code.inl{font-family:var(--font-mono); font-size:.85em; background:var(--surface-3);
+  border:1px solid var(--border); border-radius:5px; padding:1px 6px; color:var(--ink); word-break:break-word}
+
+pre{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent);
+  border-radius:10px; padding:16px 18px; overflow-x:auto; margin:0 0 18px; box-shadow:var(--shadow)}
+pre code{font-family:var(--font-mono); font-size:12.5px; line-height:1.6; color:var(--ink); white-space:pre}
+pre .fn{display:block; font-size:11px; color:var(--muted); margin-bottom:8px; letter-spacing:.02em}
+.c{color:var(--muted); font-style:italic}
+.k{color:var(--accent); font-weight:600}
+.s{color:var(--win)}
+.n2{color:var(--info)}
+
+/* cards & grids */
+.grid{display:grid; gap:16px; margin:22px 0}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; box-shadow:var(--shadow)}
+.card h4{margin-top:0; display:flex; align-items:center; gap:9px}
+.card p{font-size:.93rem; margin-bottom:0}
+.card .ico{width:30px; height:30px; border-radius:8px; display:grid; place-items:center; flex:none;
+  background:var(--accent-soft); color:var(--accent); font-family:var(--font-mono); font-weight:700; font-size:14px}
+
+.callout{border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin:22px 0; background:var(--surface-2); display:flex; gap:14px}
+.callout .bar{width:3px; border-radius:3px; background:var(--accent); flex:none}
+.callout.warn{background:var(--loss-soft); border-color:color-mix(in srgb,var(--loss) 30%, var(--border))}
+.callout.warn .bar{background:var(--loss)}
+.callout.good{background:var(--win-soft); border-color:color-mix(in srgb,var(--win) 30%, var(--border))}
+.callout.good .bar{background:var(--win)}
+.callout p{margin:0; font-size:.94rem}
+.callout .lbl{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:5px}
+
+.pill{display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:11px; letter-spacing:.03em;
+  padding:4px 10px; border-radius:20px; border:1px solid var(--border-strong); color:var(--ink-soft)}
+.pill.kill{background:var(--loss-soft); color:var(--loss); border-color:transparent}
+.pill.go{background:var(--win-soft); color:var(--win); border-color:transparent}
+.pill.info{background:var(--info-soft); color:var(--info); border-color:transparent}
+.pillrow{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 22px}
+
+.metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin:24px 0}
+.metric{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px; box-shadow:var(--shadow)}
+.metric .v{font-family:var(--font-display); font-weight:800; font-size:1.9rem; letter-spacing:-.02em; line-height:1; font-variant-numeric:tabular-nums}
+.metric .l{font-size:12.5px; color:var(--muted); margin-top:8px; line-height:1.4}
+.metric.win .v{color:var(--win)} .metric.loss .v{color:var(--loss)} .metric.acc .v{color:var(--accent)}
+
+.tablewrap{overflow-x:auto; margin:22px 0; border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow)}
+table{border-collapse:collapse; width:100%; font-size:14px; min-width:520px}
+th,td{text-align:left; padding:11px 15px; border-bottom:1px solid var(--border); vertical-align:top}
+thead th{background:var(--surface-2); font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+td.mono,th.mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+
+/* ===== "GO DEEPER" details ===== */
+details.deeper{border:1px solid var(--border-strong); border-radius:11px; margin:18px 0; background:var(--surface-2); overflow:hidden}
+details.deeper>summary{cursor:pointer; list-style:none; padding:13px 18px; font-family:var(--font-mono); font-size:12.5px; letter-spacing:.03em;
+  color:var(--accent); display:flex; align-items:center; gap:10px; user-select:none}
+details.deeper>summary::-webkit-details-marker{display:none}
+details.deeper>summary::before{content:"▸"; transition:transform .2s; display:inline-block}
+details.deeper[open]>summary::before{transform:rotate(90deg)}
+details.deeper>summary:hover{background:var(--surface-3)}
+details.deeper .inner{padding:2px 18px 6px; border-top:1px solid var(--border)}
+details.deeper .inner p{font-size:.93rem}
+.deeperbadge{margin-left:auto; font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); border:1px solid var(--border-strong); padding:2px 7px; border-radius:20px}
+
+/* pipeline flow */
+.flow{display:flex; flex-direction:column; gap:0; margin:26px 0}
+.stage{display:grid; grid-template-columns:44px 1fr; gap:16px; position:relative}
+.stage .rail-ico{position:relative; display:flex; flex-direction:column; align-items:center}
+.stage .node{width:38px; height:38px; border-radius:11px; background:var(--surface); border:1.5px solid var(--accent);
+  color:var(--accent); display:grid; place-items:center; font-family:var(--font-mono); font-weight:700; font-size:14px; z-index:2; flex:none}
+.stage .line{width:2px; flex:1; background:linear-gradient(var(--accent),var(--border)); margin:2px 0}
+.stage:last-child .line{display:none}
+.stage .body{padding-bottom:24px}
+.stage .body h4{margin:6px 0 6px}
+.stage .body .file{font-family:var(--font-mono); font-size:11.5px; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:5px; display:inline-block; margin-bottom:8px}
+.stage .body p{font-size:.93rem; margin-bottom:0}
+
+/* stack diagram */
+.stack{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin:24px 0}
+.layer{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+.layer::after{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent)}
+.layer .tool{font-family:var(--font-mono); font-weight:700; font-size:14.5px; color:var(--ink)}
+.layer .role{font-size:12.5px; color:var(--muted); margin-top:6px; line-height:1.5}
+.layer .cat{font-family:var(--font-mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin-bottom:10px}
+
+/* interactive demos */
+.demo{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px; box-shadow:var(--shadow); margin:26px 0}
+.demo h4{margin-top:0; font-family:var(--font-mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+.controls{display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; margin:8px 0 4px}
+.ctl{display:flex; flex-direction:column; gap:6px; min-width:150px; flex:1}
+.ctl label{font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; color:var(--muted); display:flex; justify-content:space-between}
+.ctl label b{color:var(--accent); font-size:12.5px}
+input[type=range]{-webkit-appearance:none; appearance:none; height:5px; border-radius:5px; background:var(--surface-3); outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:17px; height:17px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid var(--surface); box-shadow:0 1px 4px rgba(0,0,0,.3)}
+input[type=range]::-moz-range-thumb{width:15px; height:15px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid var(--surface)}
+.btnsm{font-family:var(--font-mono); font-size:12px; padding:8px 15px; border-radius:20px; border:1px solid var(--border-strong); background:var(--surface-2); color:var(--ink-soft); cursor:pointer}
+.btnsm:hover{border-color:var(--accent); color:var(--ink)}
+.readout{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin-top:18px}
+.ro{background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:12px 14px}
+.ro .v{font-family:var(--font-display); font-weight:800; font-size:1.5rem; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+.ro .l{font-size:11px; color:var(--muted); margin-top:4px; font-family:var(--font-mono); letter-spacing:.03em}
+canvas.demo-canvas{width:100%; display:block; border-radius:10px; background:var(--surface-2); border:1px solid var(--border)}
+.verdict{margin-top:16px; padding:12px 16px; border-radius:9px; font-family:var(--font-mono); font-size:13px; display:flex; gap:10px; align-items:center; line-height:1.5}
+.verdict.ok{background:var(--win-soft); color:var(--win)}
+.verdict.bad{background:var(--loss-soft); color:var(--loss)}
+.legend{display:flex; gap:18px; flex-wrap:wrap; font-family:var(--font-mono); font-size:11.5px; color:var(--muted); margin-top:14px}
+.legend span{display:inline-flex; align-items:center; gap:7px}
+.sw{width:13px; height:13px; border-radius:3px; display:inline-block}
+.sw.rd{border-radius:50%}
+
+/* repo tree */
+.tree{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px 22px; box-shadow:var(--shadow); overflow-x:auto; margin:22px 0}
+.tree pre{background:none; border:none; box-shadow:none; padding:0; margin:0}
+.tree code{font-family:var(--font-mono); font-size:12.5px; line-height:1.75; color:var(--ink-soft); white-space:pre}
+.tree .d{color:var(--accent); font-weight:600}
+.tree .cm{color:var(--muted)}
+
+/* timeline */
+.timeline{position:relative; margin:26px 0; padding-left:8px}
+.tl{display:grid; grid-template-columns:96px 1fr; gap:18px; position:relative; padding-bottom:22px}
+.tl:last-child{padding-bottom:0}
+.tl .time{font-family:var(--font-mono); font-size:12.5px; font-weight:700; color:var(--accent); text-align:right; padding-top:2px; font-variant-numeric:tabular-nums}
+.tl .dot{position:absolute; left:96px; top:6px; width:11px; height:11px; border-radius:50%; background:var(--accent); border:2px solid var(--surface); transform:translateX(-50%); z-index:2}
+.tl .content{border-left:2px solid var(--border); padding-left:24px; margin-left:-6px; padding-bottom:2px}
+.tl:last-child .content{border-left-color:transparent}
+.tl .content h4{margin:0 0 5px}
+.tl .content p{font-size:.9rem; margin:0}
+.tl .tag2{font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+
+/* compare two-col */
+.compare{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:22px 0}
+.compare .col{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; box-shadow:var(--shadow)}
+.compare .col h4{margin-top:0; font-family:var(--font-mono); font-size:13px; color:var(--accent); letter-spacing:.02em}
+.compare .col ul{margin:0; font-size:.9rem}
+
+/* KILL block */
+.killblock{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:34px; margin:26px 0; box-shadow:var(--shadow); text-align:center}
+.killblock .vs{display:flex; align-items:center; justify-content:center; gap:26px; flex-wrap:wrap}
+.killblock .num{font-family:var(--font-display); font-weight:800; font-size:clamp(2.6rem,8vw,4.4rem); letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1}
+.killblock .num.got{color:var(--loss)} .killblock .num.need{color:var(--ink)}
+.killblock .cap{font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-top:8px}
+.killblock .mid{font-family:var(--font-mono); color:var(--muted); font-size:1.4rem}
+
+/* CLI list */
+.cli{background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin:22px 0; box-shadow:var(--shadow)}
+.cli .row{display:grid; grid-template-columns:minmax(200px,auto) 1fr; gap:14px; padding:10px 18px; border-bottom:1px solid var(--border); align-items:baseline}
+.cli .row:last-child{border-bottom:none}
+.cli .cmd{font-family:var(--font-mono); font-size:12.5px; color:var(--accent)}
+.cli .desc{font-size:13px; color:var(--ink-soft)}
+.cli .row:hover{background:var(--surface-2)}
+
+/* glossary */
+.glossbar{position:relative; margin:18px 0}
+.glossbar input{width:100%; font-family:var(--font-body); font-size:15px; padding:12px 16px 12px 42px; border-radius:26px;
+  border:1px solid var(--border-strong); background:var(--surface); color:var(--ink); outline:none}
+.glossbar input:focus{border-color:var(--accent)}
+.glossbar::before{content:"⌕"; position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:18px}
+.glossgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin-top:12px}
+.term{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; box-shadow:var(--shadow)}
+.term .t{font-family:var(--font-mono); font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:5px}
+.term .t .k2{font-family:var(--font-mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin-left:8px; font-weight:600}
+.term .dfn{font-size:12.8px; color:var(--ink-soft); line-height:1.5}
+.glossempty{color:var(--muted); font-family:var(--font-mono); font-size:13px; padding:16px 4px}
+
+/* HERO */
+.hero{position:relative; padding:0; border-top:none; min-height:100vh; display:flex; flex-direction:column; justify-content:center; overflow:hidden}
+#heroCanvas{position:absolute; inset:0; width:100%; height:100%; opacity:.9}
+.hero-grad{position:absolute; inset:0; background:
+  radial-gradient(1200px 500px at 15% -5%, var(--accent-soft), transparent 60%),
+  linear-gradient(180deg, transparent 55%, var(--bg) 100%); pointer-events:none}
+.hero-inner{position:relative; z-index:2; padding:90px 0 40px}
+.hero .eyebrow{margin-bottom:22px}
+.hero h1{font-family:var(--font-display); font-weight:800; letter-spacing:-.03em; line-height:1.02;
+  font-size:clamp(2.4rem,6.2vw,4.5rem); margin:0 0 22px; max-width:16ch; text-wrap:balance}
+.hero h1 em{font-style:normal; color:var(--accent)}
+.hero .dek{font-size:clamp(1.02rem,2vw,1.28rem); color:var(--ink-soft); max-width:58ch; margin-bottom:26px}
+.hero .cta{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+.btn{display:inline-flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:13px; letter-spacing:.02em; padding:12px 20px; border-radius:26px; cursor:pointer; border:1px solid transparent}
+.btn.primary{background:var(--accent); color:#1a1205}
+.btn.primary:hover{background:var(--accent-bright); text-decoration:none}
+.btn.ghost{background:transparent; border-color:var(--border-strong); color:var(--ink-soft)}
+.btn.ghost:hover{border-color:var(--accent); color:var(--ink); text-decoration:none}
+.hero-scroll{position:absolute; bottom:24px; left:0; z-index:2; font-family:var(--font-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:10px}
+.hero-scroll .dot{width:7px; height:7px; border-radius:50%; background:var(--accent); animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.3; transform:scale(.8)}50%{opacity:1; transform:scale(1.2)}}
+
+.howto{display:flex; gap:14px; flex-wrap:wrap; margin-top:26px}
+.howto .chip{display:flex; gap:10px; align-items:center; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:12.5px; color:var(--ink-soft)}
+.howto .chip b{color:var(--ink)}
+
+footer{border-top:1px solid var(--border); padding:44px clamp(20px,5vw,64px) 60px; color:var(--muted); font-size:13.5px}
+footer .wrap{max-width:var(--maxw)}
+footer code{font-family:var(--font-mono); color:var(--ink-soft)}
+
+@media (max-width:1000px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:sticky; top:0; height:auto; flex-direction:row; align-items:center; flex-wrap:wrap; border-right:none;
+    border-bottom:1px solid var(--border); padding:12px 16px; gap:12px; z-index:50; backdrop-filter:blur(8px)}
+  .rail .brand{flex:1}
+  .toc{display:none}
+  .railfoot{margin-top:0; padding-top:0}
+  .railnote{display:none}
+  .g3,.g2,.compare{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  body{font-size:16px}
+  .metrics{grid-template-columns:1fr 1fr}
+  .controls{flex-direction:column; align-items:stretch}
+  .tl{grid-template-columns:70px 1fr; gap:12px}
+  .tl .dot{left:70px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s !important; transition-duration:.001s !important}
+  html{scroll-behavior:auto}
+}
+.reveal{opacity:0; transform:translateY(20px); transition:opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1; transform:none}
+.reveal.d1{transition-delay:.08s}.reveal.d2{transition-delay:.16s}
+@media (prefers-reduced-motion:reduce){ .reveal{opacity:1; transform:none} }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="shell">
+  <aside class="rail">
+    <div class="brand">
+      <span class="tag">MLOps · Deep Field Manual</span>
+      <h1>The Gate, Not the Model</h1>
+      <span class="sub">AI MLOps, from basics to internals — via a real NSE system</span>
+    </div>
+    <nav aria-label="Contents">
+      <ul class="toc" id="toc">
+        <li><a href="#top"><span class="n">00</span><span>Start here</span></a></li>
+        <li><a href="#what"><span class="n">01</span><span>What is MLOps?</span></a></li>
+        <li><a href="#toolkit"><span class="n">02</span><span>The MLOps toolkit</span></a></li>
+        <li><a href="#twosys"><span class="n">03</span><span>Two systems &amp; the lineage</span></a></li>
+        <li><a href="#idea"><span class="n">04</span><span>The core idea</span></a></li>
+        <li><a href="#moat"><span class="n">05</span><span>Data moat, PIT &amp; repo map</span></a></li>
+        <li><a href="#pipeline"><span class="n">06</span><span>The pipeline (with code)</span></a></li>
+        <li><a href="#geometry"><span class="n">07</span><span>Triple-barrier labeling</span></a></li>
+        <li><a href="#calibration"><span class="n">08</span><span>Calibration</span></a></li>
+        <li><a href="#conformal"><span class="n">09</span><span>The conformal gate</span></a></li>
+        <li><a href="#validate"><span class="n">10</span><span>Validation &amp; leakage</span></a></li>
+        <li><a href="#gates"><span class="n">11</span><span>The gates &amp; the KILL</span></a></li>
+        <li><a href="#serve"><span class="n">12</span><span>Serve, monitor &amp; the API</span></a></li>
+        <li><a href="#day"><span class="n">13</span><span>A day in the life</span></a></li>
+        <li><a href="#testing"><span class="n">14</span><span>Testing &amp; reproducibility</span></a></li>
+        <li><a href="#product"><span class="n">15</span><span>The product today</span></a></li>
+        <li><a href="#lessons"><span class="n">16</span><span>Lessons &amp; run it</span></a></li>
+        <li><a href="#glossary"><span class="n">17</span><span>Glossary</span></a></li>
+      </ul>
+    </nav>
+    <div class="railfoot">
+      <div class="railbtns">
+        <button class="themebtn" id="themeToggle" aria-label="Toggle color theme"><span id="themeIcon">◐</span><span id="themeLabel">Theme</span></button>
+        <button class="themebtn" id="expandAll" aria-label="Expand all deep-dive blocks"><span>⊕</span><span id="expandLabel">Deep-dives</span></button>
+      </div>
+      <p class="railnote">Self-contained — no network needed. Beginner main thread + <b>▸ Go deeper</b> blocks with real code for practitioners.</p>
+    </div>
+  </aside>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero">
+      <canvas id="heroCanvas" aria-hidden="true"></canvas>
+      <div class="hero-grad"></div>
+      <div class="hero-inner wrap">
+        <div class="eyebrow">An in-depth, end-to-end MLOps tutorial</div>
+        <h1>The product is the <em>gate</em>, not the model.</h1>
+        <p class="dek">A machine-learning system that predicts stock-trading signals for India's NSE — and then did the rarest thing in applied ML: it <strong>measured its own feasibility, found no edge, and honestly shut itself off</strong> before risking any capital. We'll learn AI MLOps from the ground up using this system: its data, its models, its gates, and its real code.</p>
+        <div class="cta">
+          <a class="btn primary" href="#what">Start the tutorial →</a>
+          <a class="btn ghost" href="#glossary">New to the jargon? Glossary</a>
+        </div>
+        <div class="howto">
+          <div class="chip"><span>📖</span><span>Read the <b>main text</b> for the concepts — no prior ML needed.</span></div>
+          <div class="chip"><span>🔬</span><span>Open <b>▸ Go deeper</b> blocks for real code &amp; math.</span></div>
+        </div>
+      </div>
+      <div class="hero-scroll"><span class="dot"></span> scroll to begin</div>
+    </section>
+
+    <!-- 01 WHAT IS MLOPS -->
+    <section id="what">
+      <div class="wrap">
+        <div class="eyebrow reveal">01 — Foundations</div>
+        <h2 class="reveal">What is MLOps, and why does it exist?</h2>
+        <p class="reveal lead">MLOps is <strong>DevOps for machine learning</strong>: the practices that take a model from a notebook experiment to a reliable, monitored, reproducible system people can trust — and keep trustworthy as the world changes.</p>
+        <p class="reveal">Why does ML need its own discipline? Start with how it differs from ordinary software.</p>
+        <div class="grid g2">
+          <div class="card reveal"><h4><span class="ico">λ</span>Traditional software</h4><p>Behavior is <strong>written by a human</strong> as explicit rules. Same input → same output. You version <em>code</em>. A passing test stays passing — logic doesn't rot on its own.</p></div>
+          <div class="card reveal d1"><h4><span class="ico">∑</span>Machine learning</h4><p>Behavior is <strong>learned from data</strong>. The "logic" is numbers fit to examples. You must version <em>code + data + model + config</em> together — and a model accurate last month can silently decay as the world drifts.</p></div>
+        </div>
+
+        <h3 class="reveal">The hidden technical debt of ML</h3>
+        <p class="reveal">A landmark Google paper put it bluntly: in a real ML system <strong>the model is a tiny box</strong> surrounded by data collection, feature engineering, validation, serving, monitoring, and configuration — and that surrounding machinery is where systems actually fail. MLOps is the engineering of that machinery.</p>
+        <div class="callout reveal"><div class="bar"></div><div><span class="lbl">The core problem MLOps solves</span><p>A model is only as good as <strong>the process that produced it and the guarantees around it</strong>. Can you reproduce it exactly? Prove it never saw the future in training? Tell when it stops working? Roll it back safely? MLOps answers all four.</p></div></div>
+
+        <h3 class="reveal">The machine-learning lifecycle</h3>
+        <p class="reveal">Every ML system moves through a loop. MLOps makes each arrow <strong>automated, versioned, and observable</strong> instead of a manual step in someone's head.</p>
+        <div class="demo reveal"><h4>The lifecycle loop</h4>
+          <canvas id="lifecycleCanvas" class="demo-canvas" height="300" aria-label="Animated ML lifecycle loop: data, features, train, validate, deploy, monitor, back to data"></canvas></div>
+
+        <h3 class="reveal">Levels of MLOps maturity</h3>
+        <div class="tablewrap reveal"><table>
+          <thead><tr><th>Level</th><th>What it looks like</th><th>The pain</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">0 — Manual</td><td>Notebooks, hand-run scripts, model emailed around.</td><td>Nothing reproducible; "works on my machine".</td></tr>
+            <tr><td class="mono">1 — Pipeline</td><td>Training is an automated, versioned pipeline; data &amp; models tracked.</td><td>Deploy &amp; monitoring still manual.</td></tr>
+            <tr><td class="mono">2 — CI/CD</td><td>Automated testing, retraining, deployment, drift monitoring, rollback.</td><td>The goal. Most systems never reach it.</td></tr>
+          </tbody></table></div>
+        <p class="reveal">This project sits at <strong>level 2</strong> — and adds something most systems lack: <em>pre-registered decision gates</em> that can stop the whole project on evidence.</p>
+      </div>
+    </section>
+
+    <!-- 02 TOOLKIT -->
+    <section id="toolkit">
+      <div class="wrap">
+        <div class="eyebrow reveal">02 — The building blocks</div>
+        <h2 class="reveal">The jobs of an MLOps stack</h2>
+        <p class="reveal lead">There's no single "MLOps tool" — it's a set of jobs, each with its own tooling. Here are the eight, each mapped to the exact tool this project uses.</p>
+        <div class="grid g2">
+          <div class="card reveal"><h4><span class="ico">1</span>Data versioning</h4><p>Snapshot the exact data a model trained on, so results reproduce. <strong class="mono" style="color:var(--accent)">→ DVC</strong> tracks big data/model files; git tracks the small pointer files.</p></div>
+          <div class="card reveal d1"><h4><span class="ico">2</span>Experiment tracking</h4><p>Log every run's params, metrics, artifacts. <strong class="mono" style="color:var(--accent)">→ MLflow</strong>, tagging each run with its git SHA + config hash.</p></div>
+          <div class="card reveal"><h4><span class="ico">3</span>Model registry</h4><p>A versioned catalog with Staging → Production stages + rollback. <strong class="mono" style="color:var(--accent)">→ MLflow Registry.</strong> The API serves whatever is in <em>Production</em>.</p></div>
+          <div class="card reveal d1"><h4><span class="ico">4</span>Pipelines &amp; CI</h4><p>Turn "run the notebook" into a deterministic, testable pipeline. <strong class="mono" style="color:var(--accent)">→ a CLI</strong> (<code class="inl">main.py --mode …</code>) + <strong class="mono" style="color:var(--accent)">pytest</strong>, offline fixtures.</p></div>
+          <div class="card reveal"><h4><span class="ico">5</span>Serving</h4><p>Expose the model behind a stable, secured interface. <strong class="mono" style="color:var(--accent)">→ FastAPI</strong> + Swagger, API-key protected, inference off the event loop.</p></div>
+          <div class="card reveal d1"><h4><span class="ico">6</span>Monitoring &amp; drift</h4><p>Detect when live data drifts from training data. <strong class="mono" style="color:var(--accent)">→ Evidently</strong> reports that can force recalibration or <em>halt</em>.</p></div>
+          <div class="card reveal"><h4><span class="ico">7</span>Explainability</h4><p>Explain each decision. <strong class="mono" style="color:var(--accent)">→ SHAP</strong> attributions + an <strong class="mono" style="color:var(--accent)">IBM Granite</strong> LLM (via Ollama) for plain-English "why".</p></div>
+          <div class="card reveal d1"><h4><span class="ico">8</span>Packaging</h4><p>Ship it identically everywhere. <strong class="mono" style="color:var(--accent)">→ Docker Compose</strong> wires MLflow, the API, and Ollama.</p></div>
+        </div>
+        <p class="reveal">Plus the modeling libraries: <strong>LightGBM</strong> &amp; <strong>CatBoost</strong> (learners), <strong>Optuna</strong> (tuning), <strong>scikit-learn</strong> (calibration &amp; metrics), <strong>FinBERT</strong> (news sentiment).</p>
+
+        <details class="deeper reveal"><summary>Go deeper — the real commands behind each tool<span class="deeperbadge">cheat-sheet</span></summary>
+        <div class="inner">
+        <h4>DVC — data versioning</h4>
+        <pre><code><span class="c"># big files live in a remote; git only stores tiny .dvc pointer files</span>
+dvc init
+dvc remote add -d storage s3://my-bucket/mlops   <span class="c"># or gdrive/ssh/azure…</span>
+dvc add data/bhavcopy data/bars models/v3        <span class="c"># creates *.dvc pointers</span>
+git add data/bhavcopy.dvc .gitignore &amp;&amp; git commit -m "snapshot data"
+dvc push                                          <span class="c"># upload to remote</span>
+dvc pull                                          <span class="c"># reproduce exactly on another machine</span></code></pre>
+        <p>In this repo <code class="inl">src/intraday/dvc_utils.py</code> wraps this — and a failed push <em>raises</em> (the fix for a bug where a model could go silently stale):</p>
+        <pre><code><span class="fn">src/intraday/dvc_utils.py</span><span class="k">def</span> add_and_push(paths):
+    <span class="k">if</span> <span class="k">not</span> is_initialized():
+        <span class="k">raise</span> DVCError(<span class="s">"DVC not initialised …"</span>)
+    remote = os.getenv(<span class="s">"DVC_REMOTE_URL"</span>, <span class="s">""</span>)
+    <span class="k">if</span> <span class="k">not</span> remote:
+        <span class="k">raise</span> DVCError(<span class="s">"DVC_REMOTE_URL not set — must be durable storage, never /tmp"</span>)
+    <span class="k">for</span> p <span class="k">in</span> paths:
+        <span class="k">if</span> (ROOT / p).exists(): _run([<span class="s">"add"</span>, p])
+    _run([<span class="s">"push"</span>])   <span class="c"># any non-zero exit raises DVCError</span></code></pre>
+        <h4>MLflow — tracking + registry</h4>
+        <pre><code>mlflow ui --port 5000                <span class="c"># the experiment/registry web UI</span>
+export MLFLOW_TRACKING_URI=http://localhost:5000</code></pre>
+        <pre><code><span class="fn">src/intraday/tracking.py — every run is provenance-tagged</span><span class="k">with</span> mlflow.start_run(run_name=kind) <span class="k">as</span> run:
+    mlflow.set_tags({<span class="s">"kind"</span>: kind,
+                     <span class="s">"git_sha"</span>: git_sha(require_clean),   <span class="c"># dirty tree → raise on gate/train</span>
+                     <span class="s">"config_hash"</span>: config_hash()})
+<span class="c"># promotion is one call; serving loads Production, paper loads Staging</span>
+client.transition_model_version_stage(name, version, <span class="s">"Production"</span>)</code></pre>
+        <h4>Evidently — drift as a kill-switch</h4>
+        <pre><code><span class="fn">src/intraday/drift.py</span><span class="k">from</span> evidently <span class="k">import</span> Report
+<span class="k">from</span> evidently.presets <span class="k">import</span> DataDriftPreset
+report = Report(metrics=[DataDriftPreset()])
+snapshot = report.run(reference_data=ref, current_data=cur)  <span class="c"># train vs live</span></code></pre>
+        <h4>Docker — one command, three services</h4>
+        <pre><code>docker-compose -f docker/docker-compose.yaml up
+<span class="c"># mlflow :5000  ·  api :8000 (models mounted read-only)  ·  ollama :11434 (Granite)</span></code></pre>
+        </div></details>
+
+        <div class="callout good reveal"><div class="bar"></div><div><span class="lbl">The whole stack in one line</span><p><strong>LightGBM/CatBoost</strong> learn · <strong>Optuna</strong> tunes · <strong>SHAP</strong> explains · <strong>scikit-learn</strong> calibrates · <strong>DVC</strong> versions data · <strong>MLflow</strong> tracks &amp; registers · <strong>Evidently</strong> watches drift · <strong>FastAPI</strong> serves · <strong>Ollama/Granite</strong> narrates · <strong>Docker</strong> packages it.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 03 TWO SYSTEMS & LINEAGE -->
+    <section id="twosys">
+      <div class="wrap">
+        <div class="eyebrow reveal">03 — Orientation</div>
+        <h2 class="reveal">Two systems, one repo — and six years of lessons</h2>
+        <p class="reveal lead">Before the code: this repository actually holds <strong>two sibling pipelines</strong>, and it's important not to confuse them.</p>
+        <div class="compare reveal">
+          <div class="col"><h4>src/intraday/ &amp; src/v6/ — the research system</h4><ul>
+            <li>The older <strong>v3/v4/v6</strong> intraday &amp; swing "selective signal" system.</li>
+            <li>Home of the <strong>heavyweight MLOps stack</strong>: MLflow, DVC, Evidently, the conformal gate, the paper runner, the hash-chained journal.</li>
+            <li>This is where the famous <strong>Phase-0 KILL</strong> happened.</li>
+          </ul></div>
+          <div class="col"><h4>src/daily/ — the current product</h4><ul>
+            <li>The <strong>daily 1–5-day swing prediction &amp; listing</strong> system — the thing that runs today.</li>
+            <li>A cleaner end-to-end ML example: panel → features → labels → model → backtest/gate → train → screen → evaluate.</li>
+            <li>Lighter provenance: a run-registry CSV + JSON reports; it <em>reuses</em> the intraday calibrator (<code class="inl">Blender</code>) and cost model.</li>
+          </ul></div>
+        </div>
+        <div class="callout reveal"><div class="bar"></div><div><span class="lbl">An honesty note this tutorial owes you</span><p>The MLflow/DVC/Evidently/conformal machinery lives on the <strong>intraday/research</strong> side. The <strong>daily</strong> product uses a simpler local run-registry and a straightforward probability threshold. When we show the full platform, we mean the whole repository's capability — not that every daily run touches MLflow. We'll flag which side each piece belongs to.</p></div></div>
+
+        <h3 class="reveal">The lineage — why the design is shaped this way</h3>
+        <p class="reveal">Each version violated one rule; the next was the accumulated response. About <strong>70% of the code carries across versions</strong> — only the horizon and feature altitude change.</p>
+        <div class="tablewrap reveal"><table>
+          <thead><tr><th>Plan</th><th>Horizon</th><th>Died because</th><th>Fix carried forward</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">v1</td><td>daily 5-class</td><td>chased "max accuracy" ≈ baseline</td><td>accuracy <strong>banned</strong>; selective contract</td></tr>
+            <tr><td class="mono">v3</td><td>intraday</td><td>the "89%-by-geometry" premise was never measured</td><td>executable gates compute the real metric</td></tr>
+            <tr><td class="mono">v4</td><td>intraday</td><td>geometry floor didn't hold on 1-min paths</td><td><strong>measure first</strong>; change the horizon</td></tr>
+            <tr><td class="mono">v6</td><td>1–5-day swing</td><td>Phase-0 KILL: floor tops out at 0.711 &lt; 0.72</td><td>re-scope to an honest recommendation product</td></tr>
+          </tbody></table></div>
+        <p class="reveal">That last row is our story's turning point — we'll reach it in <a href="#gates">Section 11</a>.</p>
+      </div>
+    </section>
+
+    <!-- 04 THE CORE IDEA -->
+    <section id="idea">
+      <div class="wrap">
+        <div class="eyebrow reveal">04 — The governing idea</div>
+        <h2 class="reveal">Engineer the win rate; ask the model only for an edge</h2>
+        <p class="reveal lead">Most people build a model that's <em>accurate</em>. This system does something subtler: it <strong>engineers the win rate with the geometry of the trade</strong> and asks the model only to add a small edge on top.</p>
+        <p class="reveal">Suppose every trade has a profit <strong>target</strong> of <code class="inl">a</code>×ATR and a <strong>stop-loss</strong> of <code class="inl">b</code>×ATR. (ATR = a stock's typical daily move.) If price were a pure coin-flip, the chance of hitting the target before the stop is pure geometry:</p>
+        <pre class="reveal"><code>baseline_win_rate = b / (a + b)          <span class="c"># wide stop + narrow target ⇒ high win rate…</span>
+                                         <span class="c"># …but each loss is big. Expectancy is what pays:</span>
+EV = <span class="k">delta</span> * (a + b) * ATR - cost      <span class="c"># delta = the model's edge, in win-rate points</span></code></pre>
+        <p class="reveal">At the no-edge baseline, expectancy is exactly <code class="inl">−cost</code>. <strong>Every rupee of profit must come from <code class="inl">delta</code></strong> — the model nudging the win rate above what geometry alone gives. That's the model's <em>only</em> job. Move the sliders:</p>
+        <div class="demo reveal"><h4>Interactive · Barrier geometry &amp; expectancy</h4>
+          <div class="controls">
+            <div class="ctl"><label>Target <b><span id="aVal">1.0</span>×ATR</b></label><input type="range" id="a" min="0.5" max="4" step="0.25" value="1"></div>
+            <div class="ctl"><label>Stop <b><span id="bVal">1.0</span>×ATR</b></label><input type="range" id="b" min="0.5" max="5" step="0.25" value="1"></div>
+            <div class="ctl"><label>Model edge δ <b><span id="dVal">0</span> pts</b></label><input type="range" id="d" min="0" max="15" step="0.5" value="0"></div>
+            <div class="ctl"><label>ATR (% of price) <b><span id="atrVal">1.5</span>%</b></label><input type="range" id="atr" min="0.5" max="4" step="0.1" value="1.5"></div>
+            <div class="ctl"><label>Round-trip cost <b><span id="cVal">0.20</span>%</b></label><input type="range" id="cost" min="0" max="1" step="0.05" value="0.2"></div>
+          </div>
+          <div class="readout">
+            <div class="ro"><div class="v" id="roBase">50%</div><div class="l">baseline win b/(a+b)</div></div>
+            <div class="ro"><div class="v" id="roWin">50%</div><div class="l">win rate + edge</div></div>
+            <div class="ro"><div class="v" id="roEV">−0.20%</div><div class="l">expectancy / trade</div></div>
+            <div class="ro"><div class="v" id="roReq">—</div><div class="l">δ needed to break even</div></div>
+          </div>
+          <div class="verdict bad" id="geoVerdict">Set an edge δ &gt; 0 to see the model earn its keep.</div>
+        </div>
+        <div class="callout reveal"><div class="bar"></div><div><span class="lbl">The frozen contract</span><p>Success was defined in advance as two numbers: <strong>win rate ≥ 80% on emitted signals</strong> AND <strong>post-cost expectancy ≥ +0.10%/trade</strong> — long-only (retail can't hold overnight shorts on NSE). The model can't move the goalposts later.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 05 DATA MOAT + REPO MAP -->
+    <section id="moat">
+      <div class="wrap">
+        <div class="eyebrow reveal">05 — Data engineering</div>
+        <h2 class="reveal">The data moat &amp; the rule that can't be broken</h2>
+        <p class="reveal lead">Before any model there is data. Everything reads from five <strong>point-in-time (PIT)</strong> stores — the moat every experiment shares.</p>
+        <div class="tablewrap reveal"><table>
+          <thead><tr><th>Store</th><th>Source</th><th>Holds</th></tr></thead>
+          <tbody>
+            <tr><td>Bhavcopy</td><td class="mono">NSE EOD</td><td>End-of-day full market — ~2,400 symbols × 763 sessions, incl. delivery %</td></tr>
+            <tr><td>Corp actions</td><td class="mono">NSE</td><td>170 split/dividend factors to back-adjust prices honestly</td></tr>
+            <tr><td>1-min bars</td><td class="mono">Upstox</td><td>Minute-level truth to settle daily-OHLC tie-breaks</td></tr>
+            <tr><td>Regime</td><td class="mono">yfinance</td><td>Global/macro context — S&amp;P, Nasdaq, crude, USD/INR, India VIX…</td></tr>
+            <tr><td>News</td><td class="mono">RSS + GDELT</td><td>Headlines scored by FinBERT sentiment (forward-only)</td></tr>
+          </tbody></table></div>
+
+        <h3 class="reveal">Where everything lives — a map of the repo</h3>
+        <div class="tree reveal"><pre><code><span class="d">AI-MLOps-Solution/</span>
+├─ <span class="d">main.py</span>                 <span class="cm"># single CLI dispatcher: --mode …</span>
+├─ <span class="d">config/</span>                <span class="cm"># config_daily.yaml · config_v3.yaml (a horizon is config, not code)</span>
+├─ <span class="d">src/</span>
+│  ├─ <span class="d">daily/</span>            <span class="cm"># THE PRODUCT: panel·features·labeler·model·backtester·trainer·screener·evaluate</span>
+│  │  └─ <span class="d">sentiment/</span>     <span class="cm"># forward-only news collector·scorer·features (FinBERT)</span>
+│  ├─ <span class="d">intraday/</span>         <span class="cm"># research system: conformal_gate·blend·drift·tracking·dvc_utils·journal·risk</span>
+│  ├─ <span class="d">v6/</span>               <span class="cm"># Phase-0 feasibility: panel·universe·labeler·grid·costs</span>
+│  ├─ <span class="d">analysis/</span>         <span class="cm"># single-stock deep analyzer (engine.py)</span>
+│  ├─ <span class="d">slm/</span>              <span class="cm"># Granite/Ollama explainer</span>
+│  └─ <span class="d">api/</span>              <span class="cm"># app.py (intraday :8000) · daily_app.py (daily :8001) + ui/</span>
+├─ <span class="d">scripts/</span>             <span class="cm"># v6_phase0_grid.py · build_daily_universe.py · preopen_capture.sh · daily_pick.sh</span>
+├─ <span class="d">data/</span>                <span class="cm"># bhavcopy·bars·daily·global·news·regime·processed·reference (DVC-tracked)</span>
+├─ <span class="d">tests/</span>               <span class="cm"># pytest, deterministic synthetic fixtures, no network</span>
+├─ <span class="d">docker/</span>              <span class="cm"># Dockerfile.{api,mlflow,ollama} + docker-compose.yaml</span>
+├─ <span class="d">mlruns/</span> <span class="d">models/</span>      <span class="cm"># MLflow store · saved model bundles</span>
+└─ <span class="d">reports/</span>             <span class="cm"># gate reports, drift HTML, daily lists, run_registry.csv</span></code></pre></div>
+
+        <h3 class="reveal">Point-in-time correctness: the cardinal sin of time-series ML</h3>
+        <p class="reveal">The commonest way financial ML "works" in a backtest and then loses money live is <strong>lookahead leakage</strong>: training on information that wasn't available yet. A feature computed at Monday's close must use <em>only</em> Monday-and-before — never a peek at Tuesday. This project enforces PIT <strong>structurally</strong>:</p>
+        <ul class="reveal">
+          <li><strong>Trailing-only windows.</strong> Every feature (ATR, RSI, momentum, z-scores) is strictly causal — a row dated D uses only data ≤ D.</li>
+          <li><strong>Survivorship-free universe.</strong> The tradeable list is recomputed monthly from <em>trailing</em> turnover, so history is judged by what was liquid <em>then</em>.</li>
+          <li><strong>Release timestamps.</strong> Global data carries a <code class="inl">release_ts</code> (US closes become public ~02:30 IST <em>next</em> day). Features filter on <code class="inl">release_ts ≤ decision_ts</code>.</li>
+          <li><strong>Imputation is never disguised.</strong> A missing optional feature becomes <code class="inl">NaN→0</code> <em>plus a <code class="inl">_present=0</code> flag</em> — so the model can tell "zero" from "absent".</li>
+        </ul>
+
+        <details class="deeper reveal"><summary>Go deeper — the fixed feature schema &amp; the serve-time guard<span class="deeperbadge">src/daily/features.py</span></summary>
+        <div class="inner">
+        <p>The schema is <strong>versioned and fixed</strong> (<code class="inl">SCHEMA_VERSION = "daily-v1"</code>): 17 required market features + 22 optional (3 F&amp;O + 11 global + 5 macro + 3 sentiment) + 22 <code class="inl">_present</code> flags = <strong>61 columns</strong>, always in the same order. The "present" trick:</p>
+        <pre><code><span class="fn">missingness — value AND a presence flag travel together</span><span class="k">for</span> f <span class="k">in</span> FNO_FEATURES:
+    out[f] = np.nan
+    out[f + <span class="s">"_present"</span>] = 0.0
+
+<span class="k">def</span> impute_optional(df):
+    <span class="c"># optional NaN → 0.0, paired with the (already-0) _present flag</span>
+    out = df.copy()
+    out[OPTIONAL_FEATURES] = out[OPTIONAL_FEATURES].fillna(0.0)
+    <span class="k">return</span> out</code></pre>
+        <p>And a guard runs <strong>before every single prediction</strong> — backtester, screener, and API alike. Train/serve can't silently diverge:</p>
+        <pre><code><span class="fn">check_schema — called before EVERY predict</span><span class="k">def</span> check_schema(df):
+    missing = [c <span class="k">for</span> c <span class="k">in</span> FEATURE_ORDER <span class="k">if</span> c <span class="k">not in</span> df.columns]
+    <span class="k">if</span> missing: <span class="k">raise</span> FeatureSchemaError(f<span class="s">"missing columns {missing}"</span>)
+    <span class="k">if</span> [c <span class="k">for</span> c <span class="k">in</span> df.columns <span class="k">if</span> c <span class="k">in</span> FEATURE_ORDER] != FEATURE_ORDER:
+        <span class="k">raise</span> FeatureSchemaError(<span class="s">"column order mismatch"</span>)
+    bad = df[MARKET_FEATURES].isna().any()
+    <span class="k">if</span> bad.any(): <span class="k">raise</span> FeatureSchemaError(f<span class="s">"NaN in market features {list(bad[bad].index)}"</span>)</code></pre>
+        </div></details>
+
+        <div class="callout warn reveal"><div class="bar"></div><div><span class="lbl">Why this is the load-bearing test</span><p>The repo's most important test is <code class="inl">test_no_lookahead_property</code>. If one feature ever peeked at the future, every downstream number — win rate, expectancy, the whole gate — would be fiction. PIT discipline is what makes the metrics <em>mean</em> anything.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 06 PIPELINE -->
+    <section id="pipeline">
+      <div class="wrap">
+        <div class="eyebrow reveal">06 — End-to-end pipeline</div>
+        <h2 class="reveal">From raw ticks to a ranked list</h2>
+        <p class="reveal lead">Here's the full journey a trading day takes. Each stage is a real module in <code class="inl">src/daily/</code>. This <em>is</em> the pipeline — automated, versioned, observable end to end.</p>
+        <div class="flow reveal">
+          <div class="stage"><div class="rail-ico"><div class="node">1</div><div class="line"></div></div><div class="body"><span class="file">panel.py</span><h4>Assemble the price panel</h4><p>Join NSE end-of-day equity + F&amp;O into one clean daily OHLCV table per stock. Prices stored raw with a corporate-action factor, adjusted <em>on load</em> — a split never silently rewrites history.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">2</div><div class="line"></div></div><div class="body"><span class="file">universe.py</span><h4>Pick the tradeable universe</h4><p>Each month, rank the whole market by trailing 6-month turnover; keep the top 100 liquid names (optionally market-cap capped). Point-in-time &amp; survivorship-free.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">3</div><div class="line"></div></div><div class="body"><span class="file">features.py</span><h4>Engineer features (schema daily-v1)</h4><p>61 strictly-trailing columns: returns 1–20d, RSI, ATR%, MA distances, 52-week position, volume/delivery/turnover z-scores, plus optional F&amp;O/global/macro/sentiment blocks each with a <code class="inl">_present</code> flag.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">4</div><div class="line"></div></div><div class="body"><span class="file">labeler.py</span><h4>Create labels (triple-barrier)</h4><p>Simulate the trade forward: target, stop, or time first? That's the label. Full detail (and the real code) in the next section.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">5</div><div class="line"></div></div><div class="body"><span class="file">model.py</span><h4>Train the model (LightGBM)</h4><p>A gradient-boosted tree classifier predicts P(win). Tuned with <strong>Optuna</strong> — only on an <em>inner</em> split of the training fold, never the data used to score it.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">6</div><div class="line"></div></div><div class="body"><span class="file">blend.py</span><h4>Calibrate the probabilities</h4><p>Raw scores aren't true probabilities. <strong>Isotonic calibration</strong> maps them so "70%" really wins ~70% of the time. Section 08.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">7</div><div class="line"></div></div><div class="body"><span class="file">conformal_gate.py</span><h4>Decide: speak or stay silent</h4><p>A custom <strong>Adaptive Conformal Inference</strong> gate sets — and self-adjusts — the fire threshold to hold a target error rate. Below the bar: silence. Section 09. <span class="pill info">research-side</span></p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">8</div><div class="line"></div></div><div class="body"><span class="file">backtester.py</span><h4>Backtest &amp; score the gates</h4><p>A <strong>purged, embargoed walk-forward</strong> replays history honestly with day-clustered confidence intervals — the decisive GO/KILL artifact.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">9</div></div><div class="body"><span class="file">screener.py → evaluate.py</span><h4>Serve the list, then keep score</h4><p>The screener ranks the universe, attaches a SHAP "why" and a trade plan, emits the top-N. Then <code class="inl">evaluate.py</code> scores every past pick against what actually happened.</p></div></div>
+        </div>
+
+        <details class="deeper reveal"><summary>Go deeper — the model &amp; its "why"<span class="deeperbadge">src/daily/model.py</span></summary>
+        <div class="inner">
+        <p><strong>LightGBM</strong> is gradient-boosted decision trees: hundreds of shallow trees, each correcting the previous ones' errors. The real hyperparameters:</p>
+        <pre><code><span class="fn">_default_params()</span><span class="k">return</span> dict(
+    objective=<span class="s">"binary"</span>, n_estimators=<span class="n2">600</span>, learning_rate=<span class="n2">0.03</span>,
+    num_leaves=<span class="n2">31</span>, max_depth=<span class="n2">6</span>, min_child_samples=<span class="n2">50</span>,
+    feature_fraction=<span class="n2">0.8</span>, bagging_fraction=<span class="n2">0.8</span>, bagging_freq=<span class="n2">1</span>,
+    class_weight=<span class="s">"balanced"</span>, verbosity=-<span class="n2">1</span>,
+)</code></pre>
+        <p>Every pick carries its top drivers via <strong>SHAP</strong> (Shapley values — each feature's fair contribution to this one prediction):</p>
+        <pre><code><span class="fn">shap_top — the listing "why"</span>explainer = shap.TreeExplainer(self.model)
+vals = explainer.shap_values(row[self.FEATURES])
+order = np.argsort(-np.abs(flat))[:n]          <span class="c"># biggest movers first</span>
+<span class="k">return</span> {self.FEATURES[i]: float(flat[i]) <span class="k">for</span> i <span class="k">in</span> order}</code></pre>
+        </div></details>
+
+        <div class="callout good reveal"><div class="bar"></div><div><span class="lbl">Train == Serve, by construction</span><p>A subtle production bug: the code that trains and the code that serves drift apart, so live features differ from training features. Defeated here by using the <strong>identical fit protocol</strong> in training and backtesting (head → calibrate → refit on the full window with frozen params) and recording the exact feature-flags a model trained under — warning loudly if serving config differs.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 07 TRIPLE BARRIER -->
+    <section id="geometry">
+      <div class="wrap">
+        <div class="eyebrow reveal">07 — Deep dive</div>
+        <h2 class="reveal">Triple-barrier labeling, animated</h2>
+        <p class="reveal lead">"What is a win?" is a design decision, not a given. The <strong>triple-barrier method</strong> answers it by simulating the trade. Watch a decision play out:</p>
+        <div class="demo reveal"><h4>Interactive · Triple-barrier labeler</h4>
+          <canvas id="barrierCanvas" class="demo-canvas" height="320" aria-label="Animated price path between target, stop, and time barriers"></canvas>
+          <div class="controls" style="margin-top:16px">
+            <button class="btnsm" id="barrierPlay">▶ Replay</button>
+            <button class="btnsm" id="barrierNext">↻ New scenario</button>
+            <div class="ctl" style="max-width:240px"><label>Stop width <b><span id="stopVal">1.5</span>×ATR</b></label><input type="range" id="stopW" min="1" max="4" step="0.5" value="1.5"></div>
+          </div>
+          <div class="verdict" id="barrierVerdict">Press replay to simulate a trade.</div>
+        </div>
+        <ul class="reveal">
+          <li><span class="pill go">TARGET</span> upper line at entry + <code class="inl">a</code>×ATR. Touch first → <strong>win (1)</strong>.</li>
+          <li><span class="pill kill">STOP</span> lower line at entry − <code class="inl">b</code>×ATR. Touch first → <strong>loss (0)</strong>.</li>
+          <li><span class="pill">TIME</span> the right edge, N sessions later. Neither touched → label by up/down.</li>
+        </ul>
+        <p class="reveal">Two honesty rules matter enormously: entry is the <strong>next session's open</strong> (never the close you just observed), and a bar touching <em>both</em> barriers counts pessimistically as the <strong>stop</strong>. Optimistic labeling is how backtests lie. Here's the real code:</p>
+        <pre class="reveal"><code><span class="fn">src/daily/labeler.py — first-touch scan, conservative on dual-touch</span><span class="k">def</span> _resolve_daily_path(path, entry, target, stop):
+    <span class="k">for</span> ts, bar <span class="k">in</span> path.iterrows():
+        hit_t, hit_s = bar.high &gt;= target, bar.low &lt;= stop
+        <span class="k">if</span> hit_s:                      <span class="c"># dual-touch or stop-only → pessimistic</span>
+            <span class="k">return</span> ts, stop, <span class="s">"stop"</span>
+        <span class="k">if</span> hit_t:
+            <span class="k">return</span> ts, target, <span class="s">"target"</span>
+    last = path.iloc[-<span class="n2">1</span>]
+    <span class="k">return</span> path.index[-<span class="n2">1</span>], float(last.close), <span class="s">"time"</span></code></pre>
+        <pre class="reveal"><code><span class="fn">the label rule (entry = NEXT session open, not today's close)</span>entry  = float(df.iloc[i + <span class="n2">1</span>][<span class="s">"open"</span>])
+target = entry * (<span class="n2">1</span> + hc[<span class="s">"target_atr"</span>] * a)
+stop   = entry * (<span class="n2">1</span> - hc[<span class="s">"stop_atr"</span>]  * a)
+exit_ts, exit_price, barrier = _resolve_daily_path(path, entry, target, stop)
+pnl_pct = (exit_price - entry) / entry
+label = int(pnl_pct &gt; <span class="n2">0</span>) <span class="k">if</span> barrier == <span class="s">"time"</span> <span class="k">else</span> int(barrier == <span class="s">"target"</span>)</code></pre>
+        <p class="reveal">Choosing <code class="inl">a</code> and <code class="inl">b</code> <em>sets</em> the baseline win rate before the model does anything — which is exactly why the <a href="#idea">geometry calculator</a> is the pivot of the whole design.</p>
+      </div>
+    </section>
+
+    <!-- 08 CALIBRATION -->
+    <section id="calibration">
+      <div class="wrap">
+        <div class="eyebrow reveal">08 — Trustworthy probabilities</div>
+        <h2 class="reveal">Calibration: making "70%" mean 70%</h2>
+        <p class="reveal lead">A model outputs a score between 0 and 1 — but raw scores are <strong>not</strong> real probabilities. A model can be 90% "confident" and right only 60% of the time. If you're going to <em>gate</em> on probability, you must first make the probability honest.</p>
+        <p class="reveal">A <strong>reliability diagram</strong> shows the problem: bucket predictions by their score (x-axis) and plot how often they actually came true (y-axis). Perfect calibration lies on the diagonal. Drag the slider to make the model over/under-confident, then calibrate it:</p>
+        <div class="demo reveal"><h4>Interactive · Reliability diagram &amp; isotonic calibration</h4>
+          <canvas id="calibCanvas" class="demo-canvas" height="330" aria-label="Reliability diagram showing a miscalibrated model curve snapping toward the diagonal after isotonic calibration"></canvas>
+          <div class="controls" style="margin-top:14px">
+            <button class="btnsm" id="calibToggle">Show calibrated ✓</button>
+            <div class="ctl" style="max-width:280px"><label>Miscalibration <b><span id="calVal">over-confident</span></b></label><input type="range" id="calAmt" min="-8" max="8" step="1" value="5"></div>
+          </div>
+          <div class="legend">
+            <span><i class="sw rd" style="background:var(--loss)"></i> raw model (miscalibrated)</span>
+            <span><i class="sw rd" style="background:var(--win)"></i> after isotonic</span>
+            <span><i class="sw" style="background:var(--muted)"></i> perfect (diagonal)</span>
+          </div>
+        </div>
+        <p class="reveal"><strong>Isotonic regression</strong> is the fix: it learns a monotonic (only-ever-increasing) step function mapping raw scores to true frequencies. It's non-parametric — it bends to whatever shape the miscalibration takes, as long as "higher score ⇒ higher truth" holds. The real code is tiny:</p>
+        <pre class="reveal"><code><span class="fn">src/intraday/blend.py — reused by the daily system</span><span class="k">def</span> fit_calibration(self, p_blend, y):
+    <span class="c"># isotonic on the OUT-OF-FOLD calibration tail — never on in-fold preds</span>
+    self.calibrator = IsotonicRegression(y_min=<span class="n2">0.0</span>, y_max=<span class="n2">1.0</span>, out_of_bounds=<span class="s">"clip"</span>)
+    self.calibrator.fit(p_blend, y)
+
+<span class="k">def</span> calibrated(self, p_price, p_flow=<span class="k">None</span>):
+    p = self.blend(p_price, p_flow)
+    <span class="k">return</span> self.calibrator.predict(p)</code></pre>
+        <div class="callout reveal"><div class="bar"></div><div><span class="lbl">The subtle discipline</span><p>Calibration is fit on an <strong>out-of-fold tail</strong> the model never trained on — fitting it on in-fold predictions would learn the model's memorized answers, not its real behavior. When two model channels exist (price + flow) a tiny grid-search picks the blend weight by log-loss first; with the flow channel off, the weight is pinned to 1.0 and only the isotonic step remains.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 09 CONFORMAL GATE -->
+    <section id="conformal">
+      <div class="wrap">
+        <div class="eyebrow reveal">09 — The decision to stay silent</div>
+        <h2 class="reveal">The adaptive conformal gate</h2>
+        <p class="reveal lead">Now that probabilities are honest, we need a rule for <em>when to speak</em>. Firing on everything above a fixed 0.80 is brittle — markets shift, and a stale threshold either over-fires (too many losers) or under-fires (misses everything). <strong>Adaptive Conformal Inference (ACI)</strong> makes the threshold self-correct to hold a target error rate.</p>
+        <p class="reveal">The idea (a form of the Gibbs–Candès online update): pick a target error budget <code class="inl">α</code> (here 0.20, i.e. aim for an 80% win rate). Start the threshold <code class="inl">τ</code> a little high. After each day's fired signals mature, nudge <code class="inl">τ</code>: if realized error beat the budget, <em>lower</em> the bar; if it overshot, <em>raise</em> it. Watch it converge:</p>
+        <div class="demo reveal"><h4>Interactive · ACI threshold holding an 80% win rate</h4>
+          <canvas id="conformalCanvas" class="demo-canvas" height="320" aria-label="Animated stream of daily calibrated probabilities with an adaptive threshold line converging so fired signals win about 80 percent"></canvas>
+          <div class="controls" style="margin-top:14px">
+            <button class="btnsm" id="confPlay">▶ Run 60 days</button>
+            <div class="ctl" style="max-width:280px"><label>Target win rate (1−α) <b><span id="confTarget">80</span>%</b></label><input type="range" id="confAlpha" min="70" max="92" step="1" value="80"></div>
+          </div>
+          <div class="readout">
+            <div class="ro"><div class="v" id="confTau">0.84</div><div class="l">threshold τ</div></div>
+            <div class="ro"><div class="v" id="confFired">0</div><div class="l">signals fired</div></div>
+            <div class="ro"><div class="v" id="confWR">—</div><div class="l">realized win rate</div></div>
+          </div>
+          <div class="legend">
+            <span><i class="sw rd" style="background:var(--win)"></i> fired &amp; won</span>
+            <span><i class="sw rd" style="background:var(--loss)"></i> fired &amp; lost</span>
+            <span><i class="sw rd" style="background:var(--muted)"></i> below τ — stayed silent</span>
+            <span><i class="sw" style="background:var(--accent)"></i> threshold τ</span>
+          </div>
+        </div>
+        <p class="reveal">Here's the actual update and fire logic — the whole gate is about 20 lines:</p>
+        <pre class="reveal"><code><span class="fn">src/intraday/conformal_gate.py — the adaptive update</span><span class="k">def</span> update(self, fired_labels):
+    <span class="k">if</span> fired_labels:
+        err = <span class="n2">1.0</span> - float(np.mean(fired_labels))          <span class="c"># realized error among fired</span>
+        self.state.tau = float(np.clip(
+            self.state.tau + self.state.gamma * (err - self.state.alpha),
+            <span class="n2">0.5</span>, <span class="n2">0.995</span>))                              <span class="c"># err&gt;α ⇒ τ rises (fewer, safer)</span>
+    <span class="k">return</span> self.state.tau</code></pre>
+        <pre class="reveal"><code><span class="fn">the fire decision — τ AND a per-model agreement floor</span><span class="k">def</span> fire(self, p_cal, p_price, p_flow=<span class="k">None</span>):
+    mask = (p_cal &gt;= self.state.tau) &amp; (p_price &gt;= self.floor)   <span class="c"># floor = 0.75</span>
+    <span class="k">if</span> self.flow_active <span class="k">and</span> p_flow <span class="k">is not</span> <span class="k">None</span>:
+        mask &amp;= p_flow &gt;= self.floor
+    <span class="k">return</span> mask</code></pre>
+        <div class="callout reveal"><div class="bar"></div><div><span class="lbl">Config (config_v3.yaml)</span><p><code class="inl">target_win_rate: 0.80</code> → α = 0.20 · <code class="inl">fire_threshold_init: 0.84</code> (a few points high so it relaxes to equilibrium) · <code class="inl">aci_gamma: 0.01</code> · <code class="inl">model_agreement_floor: 0.75</code>. τ is clipped to [0.5, 0.995]. <em>(The demo above uses a larger γ so it converges on-screen in 60 days.)</em></p></div></div>
+      </div>
+    </section>
+
+    <!-- 10 VALIDATION -->
+    <section id="validate">
+      <div class="wrap">
+        <div class="eyebrow reveal">10 — Getting the truth</div>
+        <h2 class="reveal">Validation you can trust: walk-forward &amp; leakage traps</h2>
+        <p class="reveal lead">On time series, ordinary cross-validation <strong>lies</strong> — shuffling rows lets the model train on the future and test on the past. The honest method is <strong>walk-forward</strong>.</p>
+        <div class="demo reveal"><h4>Interactive · Purged, embargoed walk-forward</h4>
+          <canvas id="wfCanvas" class="demo-canvas" height="220" aria-label="Animated walk-forward validation: expanding train window, embargo gap, moving test fold"></canvas>
+          <div class="controls" style="margin-top:14px"><button class="btnsm" id="wfPlay">▶ Play folds</button></div>
+          <div class="legend">
+            <span><i class="sw" style="background:var(--info)"></i> train (past only)</span>
+            <span><i class="sw" style="background:var(--accent)"></i> embargo gap</span>
+            <span><i class="sw" style="background:var(--win)"></i> test (out-of-sample)</span>
+          </div>
+        </div>
+        <p class="reveal">Three defenses make it honest:</p>
+        <ul class="reveal">
+          <li><strong>Walk forward.</strong> Always train on the past, test on the immediate future, then roll. Here, ≥6 folds.</li>
+          <li><strong>Purge &amp; embargo.</strong> Labels look several days ahead (the trade horizon), so training rows whose outcome overlaps the test window are <em>purged</em>, and an <em>embargo gap</em> longer than the horizon sits between train and test — killing the leakage overlapping labels create.</li>
+          <li><strong>The leakage alarm.</strong> If out-of-sample AUC ever comes back <em>above 0.80</em>, the backtester refuses the run — for this problem a score that good almost certainly means the future leaked in. <em>Suspiciously good results are treated as bugs.</em></li>
+        </ul>
+        <details class="deeper reveal"><summary>Go deeper — the per-fold protocol, the alarm, and the two gates<span class="deeperbadge">src/daily/backtester.py</span></summary>
+        <div class="inner">
+        <p>Each fold uses the exact same protocol as production training, so <strong>train == serve</strong>:</p>
+        <pre><code><span class="fn">fit_fold — head→calibrate→refit-on-full-train</span>head, tail = _inner_split(train_df)              <span class="c"># tail embargoed (60d)</span>
+pm = DailyModel()
+<span class="k">if</span> tune: pm.tune(head, head[<span class="s">"label"</span>])          <span class="c"># Optuna on inner split only</span>
+pm.fit(head, head[<span class="s">"label"</span>])
+p_tail = pm.predict_proba(tail)
+blender = Blender(flow_active=<span class="k">False</span>)             <span class="c"># single channel → isotonic only</span>
+blender.fit_calibration(p_tail, tail[<span class="s">"label"</span>].values)
+pm = DailyModel(pm.params).fit(train_df, train_df[<span class="s">"label"</span>])  <span class="c"># full-train refit, frozen</span></code></pre>
+        <pre><code><span class="fn">the leakage alarm</span>LEAKAGE_AUC_ALARM = <span class="n2">0.80</span>
+<span class="k">if</span> m1[<span class="s">"oos_auc"</span>] &gt; LEAKAGE_AUC_ALARM:
+    <span class="k">raise</span> LeakageAlarm(<span class="s">"OOS AUC … implausible at the daily horizon; investigate lookahead"</span>)</code></pre>
+        <p>The staged gate has two milestones — M1 gates whether the list ships at all; M2 gates the "actionable" label:</p>
+        <pre><code><span class="fn">M1 predictive · M2 after-cost</span>criteria_M1 = {<span class="s">"auc_ok"</span>: auc &gt;= <span class="n2">0.52</span>, <span class="s">"fold_consistency_ok"</span>: consistency &gt;= <span class="n2">0.50</span>,
+               <span class="s">"calibration_ok"</span>: calib_gap &lt;= <span class="n2">0.05</span>, <span class="s">"lift_ok"</span>: lift &gt;= <span class="n2">1.05</span>}
+criteria_M2 = {<span class="s">"expectancy_ok"</span>: net &gt;= <span class="n2">0.0</span>, <span class="s">"stress_ok"</span>: net_stress &gt;= <span class="n2">0.0</span>}  <span class="c"># base + 2× cost</span></code></pre>
+        </div></details>
+        <h3 class="reveal">Why calibration &amp; day-clustering matter</h3>
+        <p class="reveal">Confidence intervals are computed <strong>day-clustered</strong>: because regime features are constant across all of a day's signals, those signals aren't independent — naive statistics would overstate confidence. Clustering by day tells the truth about how much you really know.</p>
+        <div class="callout reveal"><div class="bar"></div><div><span class="lbl">The diagnostic that was retired</span><p>Plain accuracy at 100% coverage was <strong>banned as a decision metric</strong>. A selective system is <em>designed</em> to look near-random when forced to score everything — ≈0.50 there is expected, not failure. The only metrics that count are the win rate and expectancy of the signals it <em>chose</em> to emit.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 11 GATES & KILL -->
+    <section id="gates">
+      <div class="wrap">
+        <div class="eyebrow reveal">11 — The climax</div>
+        <h2 class="reveal">The gates — and the day the system killed itself</h2>
+        <p class="reveal lead">This is what makes the project a genuine MLOps lesson, not just an ML demo. Success and failure were <strong>defined in advance</strong>, hard-coded into the source so they couldn't be tuned after seeing results.</p>
+        <div class="tablewrap reveal"><table>
+          <thead><tr><th>Gate</th><th>Question</th><th>Bar to pass</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">0 · Feasibility</td><td>Can geometry even produce an 80% win rate here?</td><td>≥1 cell in the win-rate band, edge δ small enough to beat costs</td></tr>
+            <tr><td class="mono">1 · Data</td><td>Deep &amp; clean enough?</td><td>≥3y history, reconciles &lt;0.1% mismatch</td></tr>
+            <tr><td class="mono">2 · Labels</td><td>Does geometry hold on real paths?</td><td>measured baseline in band</td></tr>
+            <tr><td class="mono">3 · Backtest</td><td>Works out-of-sample, after costs?</td><td>win ≥80% ∧ EV ≥ +0.10% ∧ CI above floor ∧ no leakage</td></tr>
+            <tr><td class="mono">4 · Paper</td><td>Holds in live paper trading?</td><td>≥22 sessions, live matches backtest</td></tr>
+            <tr><td class="mono">5 · Capital</td><td>Safe &amp; compliant for real money?</td><td>compliance checklist + smallest size, kill-switches clean</td></tr>
+          </tbody></table></div>
+        <h3 class="reveal">Phase 0: measure first, build never</h3>
+        <p class="reveal">Every earlier version made the same mistake — <strong>build first, measure later</strong>. So v6 inverted it. Before writing any model code, it ran a pure measurement: 48 geometry "cells" (every combination of target width, stop width, holding period) scored across <strong>1.54 million rows and 2,906 symbols</strong>, judged against a gate frozen <em>before</em> anyone saw a number.</p>
+        <p class="reveal">The answer came in ~3 hours of compute, at a capital cost of exactly zero:</p>
+        <div class="killblock reveal">
+          <div class="vs">
+            <div><div class="num got" id="killGot">0.711</div><div class="cap">best cell achieved</div></div>
+            <div class="mid">&lt;</div>
+            <div><div class="num need">0.720</div><div class="cap">floor required</div></div>
+          </div>
+          <p style="margin:22px auto 0; max-width:52ch; color:var(--ink-soft)">The win-rate surface <strong>topped out at 71.1%</strong> and never reached the 72% band. Of 48 cells, <strong>zero</strong> passed. The verdict, pre-registered and unarguable:</p>
+          <div class="pillrow" style="justify-content:center; margin-top:16px"><span class="pill kill">❌ KILL — 0 / 48 cells</span></div>
+        </div>
+        <p class="reveal">"Selective-signal-by-geometry does not work, long-only, on NSE, at holds of five days or less." Later <strong>reproduced bit-for-bit</strong>. The team declined to tune the thresholds to force a pass — that would be lying — and stopped.</p>
+        <div class="callout warn reveal"><div class="bar"></div><div><span class="lbl">The most important lesson in this tutorial</span><p>A KILL is a <strong>successful outcome</strong>. The system did its job: it answered the load-bearing question <em>cheaply, honestly, and before any capital was at risk</em>. Shipping a real "no" is infinitely more valuable than shipping a false "yes." <strong>The product was never the model — it was the gate that could say no.</strong></p></div></div>
+      </div>
+    </section>
+
+    <!-- 12 SERVE & MONITOR -->
+    <section id="serve">
+      <div class="wrap">
+        <div class="eyebrow reveal">12 — Production &amp; operations</div>
+        <h2 class="reveal">Serving, monitoring, and the API surface</h2>
+        <p class="reveal lead">A model in a file is worthless. These are the components that carry a model into production and keep it honest — all built and tested in this repo.</p>
+        <div class="stack reveal">
+          <div class="layer"><div class="cat">Serve</div><div class="tool">FastAPI + Swagger</div><div class="role">Key-protected endpoints. Loads the <em>Production</em> model at startup, runs inference off the event loop, re-checks the feature schema before every predict.</div></div>
+          <div class="layer"><div class="cat">Track</div><div class="tool">MLflow Registry</div><div class="role">Every run tagged git SHA + config hash. Staging → Production; <code class="inl">promote</code>/<code class="inl">rollback</code> one command. Dirty git tree refuses to train.</div></div>
+          <div class="layer"><div class="cat">Version</div><div class="tool">DVC</div><div class="role">Data &amp; model files versioned to a remote. A failed push <em>raises</em> — no silent staleness.</div></div>
+          <div class="layer"><div class="cat">Monitor</div><div class="tool">Evidently</div><div class="role">Live feature distributions vs the training reference. Drift forces recalibration; consecutive breaches <strong>halt</strong> trading.</div></div>
+          <div class="layer"><div class="cat">Explain</div><div class="tool">SHAP + Granite</div><div class="role">SHAP gives the drivers; an IBM Granite LLM (via Ollama) turns them into a sentence — async, never on the decision path.</div></div>
+          <div class="layer"><div class="cat">Audit</div><div class="tool">Hash-chained journal</div><div class="role">Every fill/exit written to a tamper-evident, hash-linked journal. Health endpoint verifies the chain.</div></div>
+        </div>
+
+        <h3 class="reveal">The API surface</h3>
+        <p class="reveal">Two FastAPI apps. Every endpoint needs an <code class="inl">X-API-Key</code> header (except the HTML UI pages).</p>
+        <div class="tablewrap reveal"><table>
+          <thead><tr><th>Daily app <span class="mono" style="text-transform:none">:8001</span></th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">GET /daily/list</td><td>today's ranked picks per horizon (the JSON below)</td></tr>
+            <tr><td class="mono">GET /daily/list/history</td><td>past lists (<code class="inl">?days=30</code>)</td></tr>
+            <tr><td class="mono">GET /daily/scoreboard</td><td>predict-vs-actual, <code class="inl">?source=oos|live</code></td></tr>
+            <tr><td class="mono">GET /pipeline/status · /trace · /stream</td><td>live per-step + per-stock observability (NDJSON stream)</td></tr>
+            <tr><td class="mono">POST /pipeline/run · /stop</td><td>trigger / halt the observable pipeline (<code class="inl">?live=</code>)</td></tr>
+            <tr><td class="mono">GET /analyze/{symbol}</td><td>full single-stock deep analysis</td></tr>
+            <tr><td class="mono">GET /health</td><td>model source/age, latest list date, halt status</td></tr>
+          </tbody></table></div>
+        <p class="reveal">And the research (intraday) app on <span class="mono">:8000</span> exposes <code class="inl">/signals/today</code>, <code class="inl">/signals/history</code>, <code class="inl">/screen/today</code>, <code class="inl">/performance</code>, <code class="inl">/drift</code>, and a background <code class="inl">POST /backtest</code> job — plus Swagger at <code class="inl">/docs</code>.</p>
+
+        <details class="deeper reveal"><summary>Go deeper — one "pick", exactly as the API returns it<span class="deeperbadge">src/daily/screener.py</span></summary>
+        <div class="inner">
+        <p><code class="inl">GET /daily/list</code> returns <code class="inl">{"date": …, "horizons": {"swing_1_5d": {"picks": [ … ]}}}</code>. Each pick is assembled by <code class="inl">screen_day</code> + the <code class="inl">_trade_plan</code> helper — note it's an <em>honest research aid</em>: a rule-based entry, real cost-aware levels, and calibrated probability, not a promise.</p>
+        <pre><code><span class="fn">one element of picks[] (fields are real; values illustrative)</span>{
+  <span class="s">"symbol"</span>: <span class="s">"DIXON"</span>,
+  <span class="s">"p_up"</span>: <span class="n2">0.58</span>,            <span class="c"># calibrated P(win) = P(up)</span>
+  <span class="s">"prob"</span>: <span class="n2">0.58</span>,            <span class="c"># duplicate for convenience</span>
+  <span class="s">"direction"</span>: <span class="s">"LONG"</span>,     <span class="c"># long-only in v1</span>
+  <span class="s">"why"</span>: [<span class="s">"20-day trend (+)"</span>, <span class="s">"delivery z (+)"</span>, <span class="s">"below 50-DMA (−)"</span>],  <span class="c"># humanized SHAP</span>
+  <span class="s">"ref_close"</span>: <span class="n2">14231.50</span>,   <span class="c"># decision-day close (as-traded)</span>
+  <span class="s">"atr_pct"</span>: <span class="n2">0.021</span>,
+  <span class="s">"entry_rule"</span>: <span class="s">"next session open"</span>,
+  <span class="s">"target_price"</span>: <span class="n2">14530.36</span>, <span class="s">"target_pct"</span>: <span class="n2">2.10</span>,
+  <span class="s">"stop_price"</span>: <span class="n2">13932.64</span>,   <span class="s">"stop_pct"</span>: <span class="n2">2.10</span>,
+  <span class="s">"max_hold_days"</span>: <span class="n2">5</span>,
+  <span class="s">"qty_ref"</span>: <span class="n2">7</span>, <span class="s">"capital_ref_inr"</span>: <span class="n2">100000</span>
+}</code></pre>
+        <p>If the panel can't load, the price levels stay <code class="inl">null</code> but the pick still ships — fail-soft, never fabricated.</p>
+        </div></details>
+
+        <h3 class="reveal">The monitoring loop that never stops</h3>
+        <pre class="reveal"><code>serve prediction ──► log to journal ──► compare live vs training features
+      ▲                                              │
+      │                                     drift detected?
+      │                                    ┌─────────┴─────────┐
+      └──── recalibrate ◄── yes (mild) ────┘         yes (severe) ──► HALT</code></pre>
+        <details class="deeper reveal"><summary>Go deeper — the drift kill-switch<span class="deeperbadge">src/intraday/drift.py</span></summary>
+        <div class="inner">
+        <pre><code><span class="fn">Evidently import failure itself raises — drift gates trading</span><span class="k">if</span> breach:
+    _set_recalib_flag()
+    _append_alert(day, summary)
+    <span class="k">if</span> _consecutive_breaches(day) &gt;= cfg[<span class="s">"consecutive_breaches_to_halt"</span>]:
+        _persist_halt([<span class="s">"drift"</span>])
+        summary[<span class="s">"halted"</span>] = <span class="k">True</span></code></pre>
+        <p>The streak is keyed by date, so re-running the check twice in a day can't double-count; a clean day resets it.</p>
+        </div></details>
+        <p class="reveal">It all ships as three <strong>Docker</strong> services — <code class="inl">mlflow</code> (:5000), <code class="inl">api</code> (:8000, models mounted read-only), <code class="inl">ollama</code> (Granite) — so it runs identically anywhere.</p>
+      </div>
+    </section>
+
+    <!-- 13 DAY IN THE LIFE -->
+    <section id="day">
+      <div class="wrap">
+        <div class="eyebrow reveal">13 — Operations</div>
+        <h2 class="reveal">A day in the life (all times IST)</h2>
+        <p class="reveal lead">MLOps isn't just training — it's the scheduled, self-healing choreography that runs every trading day. Here's the real cadence, from cron.</p>
+        <div class="timeline reveal">
+          <div class="tl"><div class="time">08:00</div><div class="dot"></div><div class="content"><span class="tag2">cron · pre-open</span><h4>Regime &amp; news capture</h4><p><code class="inl">preopen_capture.sh</code> pulls the overnight global/macro snapshot and RSS+GDELT headlines (scored by FinBERT). Each channel degrades to a clean no-op if its dependency or network is absent.</p></div></div>
+          <div class="tl"><div class="time">08:55</div><div class="dot"></div><div class="content"><span class="tag2">token</span><h4>Broker token refresh</h4><p>Upstox tokens expire daily (~03:30). An auth ping at 08:55 confirms the live feed before the session — else the pipeline degrades gracefully to EOD.</p></div></div>
+          <div class="tl"><div class="time">09:10</div><div class="dot"></div><div class="content"><span class="tag2">cron · pre-open</span><h4>Second capture</h4><p>A late-headlines + fresh-Asia-levels pull, just before the 09:15 open.</p></div></div>
+          <div class="tl"><div class="time">09:15</div><div class="dot"></div><div class="content"><span class="tag2">market</span><h4>NSE opens</h4><p>The <strong>daily</strong> product runs long-only entries at the open using the list decided on the prior close (or a provisional live snapshot).</p></div></div>
+          <div class="tl"><div class="time">14:45</div><div class="dot"></div><div class="content"><span class="tag2">risk</span><h4>Intraday square-off</h4><p>The research (intraday) paper runner flattens every position — always flat overnight.</p></div></div>
+          <div class="tl"><div class="time">18:30</div><div class="dot"></div><div class="content"><span class="tag2">data</span><h4>NSE publishes the final bhavcopy</h4><p>The day's official, complete EOD data lands — the settled base for tomorrow's list.</p></div></div>
+          <div class="tl"><div class="time">19:30</div><div class="dot"></div><div class="content"><span class="tag2">cron · the main job</span><h4>The observable pipeline</h4><p><code class="inl">daily_pick.sh → --mode daily-pipeline</code>: fetch EOD → global → rebuild panel → score universe → picks → notify. Streams per-step status to the UI, and falls back to the last session on disk if today's data isn't published.</p></div></div>
+        </div>
+        <div class="callout reveal"><div class="bar"></div><div><span class="lbl">Longer cadences</span><p><strong>Weekly:</strong> <code class="inl">daily-backtest</code> + <code class="inl">daily-train</code> (and, research-side, <code class="inl">recalibrate</code> + <code class="inl">gates</code>). <strong>Monthly (first weekend):</strong> refresh corporate actions, rebuild the PIT universe, extend the panel. The list decided on day <em>T</em>'s close is for entry at <em>T+1</em>'s open.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 14 TESTING -->
+    <section id="testing">
+      <div class="wrap">
+        <div class="eyebrow reveal">14 — Confidence in the code</div>
+        <h2 class="reveal">Testing &amp; reproducibility</h2>
+        <p class="reveal lead">In a real-money system, a bug isn't a glitch — it's a false signal. Tests here aren't a formality; several are <strong>load-bearing</strong>, guarding the exact traps that would silently corrupt every downstream number.</p>
+        <div class="grid g3">
+          <div class="card reveal"><h4>No-lookahead</h4><p><code class="inl">test_no_lookahead_property</code> — a property test that would catch any feature peeking at the future (bug class B-4).</p></div>
+          <div class="card reveal d1"><h4>Regime PIT</h4><p><code class="inl">test_regime</code> — the regime channel's lookahead exclusion, veto logic, and news degradation.</p></div>
+          <div class="card reveal d2"><h4>Labeler geometry</h4><p><code class="inl">test_geometry_v4</code> — the labeler override that, if broken, would have silently corrupted every grid sweep.</p></div>
+        </div>
+        <p class="reveal">There's also a <strong>dead-control sweep</strong> — an unusual, sharp idea. It fails the build if any safety control loses its live call site, or if any deleted legacy module is still referenced:</p>
+        <details class="deeper reveal"><summary>Go deeper — the dead-control &amp; dead-import sweep<span class="deeperbadge">tests/test_dead_controls.py</span></summary>
+        <div class="inner">
+        <p><code class="inl">test_controls_have_external_call_sites</code> fails if any of these lose an external caller — a control that isn't called is worse than no control, because it looks like protection:</p>
+        <pre><code>check_kill_switches (risk.py)   cross_check_bhavcopy (bars.py)
+run_check           (drift.py)  reconcile_day        (data_feed.py)
+tune                (price_model.py)  check_schema    (features.py)</code></pre>
+        <p><code class="inl">test_no_v1_module_references</code> fails if any decommissioned v1 module (<code class="inl">xgboost_model</code>, <code class="inl">lstm_model</code>, <code class="inl">chronos_model</code>, <code class="inl">ensemble_model</code>, <code class="inl">news_scraper</code>, …) is still imported anywhere — so a killed approach can't linger as zombie code.</p>
+        </div></details>
+        <p class="reveal">The whole suite runs on <strong>deterministic synthetic fixtures with no network</strong>, and Gate 0 requires it all green at <strong>≥85% coverage</strong>. Reproducibility is the same story from the other side: every training run is tagged with its git SHA + config hash, data is DVC-pinned, and re-running Phase 0 in 2026 matched the committed KILL <em>bit-for-bit</em>.</p>
+      </div>
+    </section>
+
+    <!-- 15 PRODUCT TODAY -->
+    <section id="product">
+      <div class="wrap">
+        <div class="eyebrow reveal">15 — Where it is now</div>
+        <h2 class="reveal">The honest product that survived</h2>
+        <p class="reveal lead">After the KILL, the project re-scoped to something honest and useful <em>right now</em>: an <strong>observable, automated pre-market recommendation tool</strong> — decision support, never an auto-trader.</p>
+        <div class="flow reveal">
+          <div class="stage"><div class="rail-ico"><div class="node">0</div><div class="line"></div></div><div class="body"><h4>Pre-market trigger</h4><p>A scheduler fires before the 09:15 open, respecting the NSE holiday calendar.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">1</div><div class="line"></div></div><div class="body"><h4>Data acquisition</h4><p>Yesterday's official EOD close <em>plus</em> a live Upstox snapshot clearly labeled <span class="pill">PROVISIONAL</span>. Each source fails soft and is traced — a dead source degrades a feature, never fabricates one.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">2</div><div class="line"></div></div><div class="body"><h4>Universe selection</h4><p>The most-liquid mid-cap-and-below names, point-in-time.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">3</div><div class="line"></div></div><div class="body"><h4>Per-stock analysis</h4><p>Technicals · flow · fundamentals · news · regime · the model's calibrated P(win) · a transparent scorecard · a BUY/HOLD/SELL verdict with confidence and data-completeness labels.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">4</div><div class="line"></div></div><div class="body"><h4>Live observability</h4><p>Per-step status and a per-stock trace stream to the UI in real time.</p></div></div>
+          <div class="stage"><div class="rail-ico"><div class="node">5</div></div><div class="body"><h4>Ranked BUY list</h4><p>Each pick: calibrated probability, confidence, the evidence, and a complete pre-committed trade plan (entry, stop, target, quantity, cost).</p></div></div>
+        </div>
+        <div class="callout warn reveal"><div class="bar"></div><div><span class="lbl">The disclaimer, verbatim from the code</span><p style="font-family:var(--font-mono); font-size:.85rem; line-height:1.6">"Research aid, not investment advice. … this repo's measured record shows <strong>NO proven predictive edge</strong> for any model at these horizons. Verify every input via the reference links before acting; markets carry risk of loss."</p></div></div>
+        <p class="reveal">That honesty is <strong>engineered in</strong>, not bolted on. Every probability is shown with its confidence and data-completeness; the rare "strong signal" tier (P ≥ 0.80) is expected to fire almost never until a model earns real edge — and any future edge claim must come from a <em>fresh, pre-registered backtest gate</em>, never from re-labeling the old KILL. This is what responsible ML in a high-stakes domain looks like.</p>
+      </div>
+    </section>
+
+    <!-- 16 LESSONS -->
+    <section id="lessons">
+      <div class="wrap">
+        <div class="eyebrow reveal">16 — Takeaways</div>
+        <h2 class="reveal">Nine MLOps lessons to carry away</h2>
+        <div class="grid g3">
+          <div class="card reveal"><h4>Measure first</h4><p>Answer the load-bearing question with the cheapest experiment, before you build.</p></div>
+          <div class="card reveal d1"><h4>Pre-register success</h4><p>Freeze the metric &amp; threshold before results, so you can't move the goalposts.</p></div>
+          <div class="card reveal d2"><h4>PIT or nothing</h4><p>On time series, structural no-lookahead is the line between science and fiction.</p></div>
+          <div class="card reveal"><h4>Train == serve</h4><p>Identical fit path in training and production; record the config gap.</p></div>
+          <div class="card reveal d1"><h4>Calibrate</h4><p>An uncalibrated probability can't gate a decision. Isotonic maps scores to truth.</p></div>
+          <div class="card reveal d2"><h4>Validate honestly</h4><p>Walk-forward, purge, embargo. Treat suspiciously good results as bugs.</p></div>
+          <div class="card reveal"><h4>Reproduce exactly</h4><p>Version code + data + model + config together, or you have nothing.</p></div>
+          <div class="card reveal d1"><h4>Monitor as a kill-switch</h4><p>Drift detection that can halt beats a dashboard nobody reads.</p></div>
+          <div class="card reveal d2"><h4>A "no" is a win</h4><p>The gate that can honestly stop the project is the most valuable thing you build.</p></div>
+        </div>
+        <h3 class="reveal">Run it yourself</h3>
+        <div class="cli reveal">
+          <div class="row"><span class="cmd">--mode daily-pipeline</span><span class="desc">The observable end-to-end job: fetch → panel → score → notify (live UI stream).</span></div>
+          <div class="row"><span class="cmd">--mode daily-universe</span><span class="desc">Rebuild the point-in-time top-100 liquidity universe.</span></div>
+          <div class="row"><span class="cmd">--mode daily-backtest</span><span class="desc">Purged walk-forward backtest + staged gate; prints the verdict.</span></div>
+          <div class="row"><span class="cmd">--mode daily-train</span><span class="desc">Train &amp; save the deployable production bundle.</span></div>
+          <div class="row"><span class="cmd">--mode daily-list</span><span class="desc">Generate today's ranked picks with trade plans.</span></div>
+          <div class="row"><span class="cmd">--mode daily-eval</span><span class="desc">Score past picks against reality — the honesty scoreboard.</span></div>
+          <div class="row"><span class="cmd">--mode daily-serve</span><span class="desc">Launch the FastAPI app (Swagger at /docs).</span></div>
+        </div>
+        <p class="reveal">And to reproduce the Phase 0 KILL — the heart of this story — takes ~3 minutes, no network:</p>
+        <pre class="reveal"><code><span class="c"># deterministic; the verdict is computed from data already on disk</span>
+python -m scripts.v6_cost_curve      <span class="c"># freeze the cost model first</span>
+python -m scripts.v6_phase0_grid     <span class="c"># score all 48 geometry cells</span>
+python -m scripts.v6_phase0_report   <span class="c"># → reports/v6/phase0_report.md  (verdict: KILL)</span></code></pre>
+        <div class="callout good reveal"><div class="bar"></div><div><span class="lbl">The whole tutorial in one sentence</span><p>MLOps is the discipline that lets an ML system be <strong>reproduced, trusted, monitored, and — when the evidence demands it — honestly stopped</strong>. This project is a rare, complete example of all four.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 17 GLOSSARY -->
+    <section id="glossary">
+      <div class="wrap">
+        <div class="eyebrow reveal">17 — Reference</div>
+        <h2 class="reveal">Glossary</h2>
+        <p class="reveal lead">Every domain and ML term this tutorial uses. Type to filter.</p>
+        <div class="glossbar reveal"><input type="text" id="glossSearch" placeholder="Search terms — e.g. 'calibration', 'ATR', 'drift'…" aria-label="Search glossary"></div>
+        <div class="glossgrid reveal" id="glossGrid"></div>
+        <p class="glossempty" id="glossEmpty" style="display:none">No term matches that search.</p>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <p>Built as an educational companion to the <code>AI-MLOps-Solution</code> repository. Every number, module, command, and code excerpt is drawn from the project's real source and documents (<code>SOLUTION_FLOW.md</code>, <code>PLAN_v6</code>, <code>src/daily/</code>, <code>src/intraday/</code>, <code>config/</code>).</p>
+        <p style="margin-bottom:0">This page is a tutorial, not financial advice. The system's own measured record shows no proven predictive edge at these horizons — which is exactly the honesty this tutorial is about.</p>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function el(id){ return document.getElementById(id); }
+
+  /* THEME */
+  var root=document.documentElement, stored=null;
+  try{ stored=localStorage.getItem("mlops-theme"); }catch(e){}
+  if(stored) root.setAttribute("data-theme",stored);
+  function curTheme(){ var t=root.getAttribute("data-theme"); if(t) return t;
+    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"; }
+  function paintTheme(){ var t=curTheme(); el("themeIcon").textContent=t==="dark"?"☾":"☀"; el("themeLabel").textContent=t==="dark"?"Dark":"Light"; }
+  paintTheme();
+  el("themeToggle").addEventListener("click",function(){
+    var next=curTheme()==="dark"?"light":"dark"; root.setAttribute("data-theme",next);
+    try{ localStorage.setItem("mlops-theme",next); }catch(e){}
+    paintTheme(); repaintAll();
+  });
+
+  /* EXPAND ALL DEEP-DIVES */
+  var allOpen=false;
+  el("expandAll").addEventListener("click",function(){
+    allOpen=!allOpen;
+    document.querySelectorAll("details.deeper").forEach(function(d){ d.open=allOpen; });
+    el("expandLabel").textContent=allOpen?"Collapse":"Deep-dives";
+  });
+
+  /* PROGRESS */
+  var progress=el("progress");
+  window.addEventListener("scroll",function(){
+    var h=document.documentElement.scrollHeight-window.innerHeight;
+    progress.style.width=(h>0?(window.scrollY/h)*100:0)+"%";
+  },{passive:true});
+
+  /* ACTIVE NAV */
+  var links=[].slice.call(document.querySelectorAll(".toc a")), map={};
+  links.forEach(function(a){ map[a.getAttribute("href").slice(1)]=a; });
+  var navObs=new IntersectionObserver(function(es){es.forEach(function(e){
+    if(e.isIntersecting){ links.forEach(function(a){a.classList.remove("active");}); var a=map[e.target.id]; if(a)a.classList.add("active"); }
+  });},{rootMargin:"-45% 0px -50% 0px",threshold:0});
+  document.querySelectorAll("section[id]").forEach(function(s){ navObs.observe(s); });
+
+  /* REVEAL */
+  var reveals=[].slice.call(document.querySelectorAll(".reveal"));
+  if(reduce){ reveals.forEach(function(r){r.classList.add("in");}); }
+  else{ var ro=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){e.target.classList.add("in"); ro.unobserve(e.target);} });},{threshold:0.12,rootMargin:"0px 0px -8% 0px"});
+    reveals.forEach(function(r){ ro.observe(r); }); }
+
+  /* canvas sizing */
+  function size(cv){ var dpr=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
+    cv.width=Math.max(1,r.width*dpr); cv.height=Math.max(1,r.height*dpr);
+    var ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {w:r.width,h:r.height,ctx:ctx}; }
+
+  /* ===== HERO ===== */
+  var hero=el("heroCanvas"), heroData=(function(){var a=[],v=0; for(var i=0;i<140;i++){v+=Math.sin(i*0.19)*1.4+Math.cos(i*0.07)*2.0+i*0.06; a.push(v);} return a;})(), heroT=0;
+  function drawHero(){ if(!hero) return; var d=size(hero),ctx=d.ctx,w=d.w,h=d.h; ctx.clearRect(0,0,w,h);
+    var accent=css("--accent"),grid=css("--border"),win=css("--win"),n=heroData.length,
+        min=Math.min.apply(null,heroData),max=Math.max.apply(null,heroData),pad=h*0.18;
+    ctx.strokeStyle=grid; ctx.globalAlpha=.5; ctx.lineWidth=1;
+    for(var gx=0;gx<w;gx+=64){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,h);ctx.stroke();}
+    for(var gy=0;gy<h;gy+=64){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(w,gy);ctx.stroke();}
+    ctx.globalAlpha=1;
+    function X(i){return i/(n-1)*w;} function Y(v){return h-pad-(v-min)/(max-min)*(h-2*pad);}
+    var shown=Math.max(1,Math.floor(heroT));
+    var g=ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,accent); g.addColorStop(1,"transparent");
+    ctx.globalAlpha=.14; ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(X(0),h);
+    for(var i=0;i<shown;i++) ctx.lineTo(X(i),Y(heroData[i])); ctx.lineTo(X(shown-1),h); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
+    ctx.strokeStyle=accent; ctx.lineWidth=2.2; ctx.lineJoin="round"; ctx.beginPath();
+    for(var j=0;j<shown;j++){var x=X(j),y=Y(heroData[j]); j?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke();
+    if(shown>1){var lx=X(shown-1),ly=Y(heroData[shown-1]); ctx.fillStyle=accent; ctx.beginPath();ctx.arc(lx,ly,4.5,0,7);ctx.fill();
+      ctx.globalAlpha=.25;ctx.beginPath();ctx.arc(lx,ly,10,0,7);ctx.fill();ctx.globalAlpha=1;}
+    ctx.fillStyle=win; for(var k=18;k<shown;k+=34){ctx.globalAlpha=.9;ctx.beginPath();ctx.arc(X(k),Y(heroData[k]),3,0,7);ctx.fill();} ctx.globalAlpha=1;
+  }
+  function animHero(){ if(reduce){heroT=heroData.length;drawHero();return;} if(heroT<heroData.length){heroT+=1.6;drawHero();requestAnimationFrame(animHero);} else drawHero(); }
+
+  /* ===== LIFECYCLE ===== */
+  var lc=el("lifecycleCanvas"), lcStages=["Data","Features","Train","Validate","Deploy","Monitor"], lcAngle=0;
+  function drawLifecycle(){ if(!lc) return; var d=size(lc),ctx=d.ctx,w=d.w,h=d.h; ctx.clearRect(0,0,w,h);
+    var accent=css("--accent"),ink=css("--ink"),muted=css("--muted"),border=css("--border-strong"),surf=css("--surface-2");
+    var cx=w/2,cy=h/2,R=Math.min(w,h)*0.33,N=lcStages.length;
+    ctx.strokeStyle=border;ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();
+    ctx.strokeStyle=accent;ctx.lineWidth=3.5;ctx.lineCap="round";ctx.beginPath();ctx.arc(cx,cy,R,lcAngle,lcAngle+1.1);ctx.stroke();
+    for(var i=0;i<N;i++){ var ang=i/N*Math.PI*2-Math.PI/2,x=cx+Math.cos(ang)*R,y=cy+Math.sin(ang)*R;
+      var na=((ang)%(Math.PI*2)+Math.PI*2)%(Math.PI*2), la=((lcAngle+0.55)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
+      var passing=Math.abs(na-la)<0.5||Math.abs(na-la)>(Math.PI*2-0.5);
+      ctx.fillStyle=passing?accent:surf; ctx.strokeStyle=passing?accent:border; ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(x,y,7,0,7);ctx.fill();ctx.stroke();
+      ctx.fillStyle=passing?accent:ink; ctx.font=(passing?"700 ":"500 ")+"13px "+css("--font-mono");
+      ctx.textAlign=Math.cos(ang)>0.3?"left":(Math.cos(ang)<-0.3?"right":"center");
+      ctx.textBaseline=Math.sin(ang)>0.3?"top":(Math.sin(ang)<-0.3?"bottom":"middle");
+      ctx.fillText(lcStages[i],cx+Math.cos(ang)*(R+16),cy+Math.sin(ang)*(R+16)); }
+    ctx.fillStyle=muted;ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="600 11px "+css("--font-mono");
+    ctx.fillText("MLOps automates",cx,cy-9); ctx.fillText("every arrow",cx,cy+9);
+  }
+  function animLifecycle(){ if(reduce){drawLifecycle();return;} lcAngle+=0.012; if(lcAngle>Math.PI*2)lcAngle-=Math.PI*2; drawLifecycle(); requestAnimationFrame(animLifecycle); }
+
+  /* ===== GEOMETRY CALC ===== */
+  var gc={a:el("a"),b:el("b"),d:el("d"),atr:el("atr"),cost:el("cost")};
+  function fmtPct(x){ return (x>=0?"":"−")+Math.abs(x).toFixed(2)+"%"; }
+  function calcGeo(){ var a=+gc.a.value,b=+gc.b.value,delta=+gc.d.value,atr=+gc.atr.value,cost=+gc.cost.value;
+    el("aVal").textContent=a.toFixed(2);el("bVal").textContent=b.toFixed(2);el("dVal").textContent=delta.toFixed(1);
+    el("atrVal").textContent=atr.toFixed(1);el("cVal").textContent=cost.toFixed(2);
+    var base=b/(a+b), win=Math.min(0.999,base+delta/100), ev=(delta/100)*(a+b)*atr-cost, req=(cost/((a+b)*atr))*100;
+    el("roBase").textContent=(base*100).toFixed(1)+"%"; el("roWin").textContent=(win*100).toFixed(1)+"%";
+    el("roEV").textContent=fmtPct(ev); el("roEV").style.color=ev>=0?css("--win"):css("--loss");
+    el("roReq").textContent=req.toFixed(1)+" pts";
+    var v=el("geoVerdict");
+    if(ev>=0){v.className="verdict ok"; v.textContent="✓ Positive expectancy: with δ="+delta.toFixed(1)+" pts of real edge, this geometry pays after costs.";}
+    else{v.className="verdict bad"; v.textContent="✗ Negative expectancy: the model needs ≥ "+req.toFixed(1)+" pts of edge just to break even. (v6's best measured edge fell short.)";}
+  }
+  Object.keys(gc).forEach(function(k){ gc[k].addEventListener("input",calcGeo); }); calcGeo();
+
+  /* ===== TRIPLE BARRIER ===== */
+  var bc=el("barrierCanvas"), barrier={t:0,raf:null,stopMult:1.5,res:null}, curPath=null, scen=["win","loss","time"], si=0;
+  function genPath(s){ var n=70,entry=100,atr=6,arr=[entry],v=entry,drift=s==="win"?0.55:(s==="loss"?-0.5:0.02);
+    for(var i=1;i<n;i++){ v+=drift+Math.sin(i*0.4)*1.3+Math.cos(i*1.7)*1.1+((i%7===0)?(s==="win"?2:-2):0); arr.push(v);} return {arr:arr,entry:entry,atr:atr}; }
+  function evalB(){ var e=curPath.entry,atr=curPath.atr,target=e+1.0*atr,stop=e-barrier.stopMult*atr;
+    for(var i=1;i<curPath.arr.length;i++){ if(curPath.arr[i]>=target)return{outcome:"win",idx:i,target:target,stop:stop};
+      if(curPath.arr[i]<=stop)return{outcome:"loss",idx:i,target:target,stop:stop}; }
+    var last=curPath.arr[curPath.arr.length-1]; return {outcome:last>e?"time-win":"time-loss",idx:curPath.arr.length-1,target:target,stop:stop}; }
+  function drawB(res,upto){ var d=size(bc),ctx=d.ctx,w=d.w,h=d.h; ctx.clearRect(0,0,w,h);
+    var win=css("--win"),loss=css("--loss"),ink=css("--ink"),muted=css("--muted"),accent=css("--accent"),arr=curPath.arr,e=curPath.entry;
+    var lo=Math.min(res.stop,Math.min.apply(null,arr))-3, hi=Math.max(res.target,Math.max.apply(null,arr))+3, pT=14,pB=14;
+    function X(i){return 8+i/(arr.length-1)*(w-16);} function Y(v){return pT+(1-(v-lo)/(hi-lo))*(h-pT-pB);}
+    ctx.fillStyle=win;ctx.globalAlpha=.08;ctx.fillRect(0,0,w,Y(res.target));
+    ctx.fillStyle=loss;ctx.fillRect(0,Y(res.stop),w,h-Y(res.stop));ctx.globalAlpha=1;
+    function hl(y,c,label){ ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle=c;ctx.font="600 11px "+css("--font-mono");ctx.textAlign="left";ctx.textBaseline="bottom";ctx.fillText(label,6,y-3); }
+    hl(Y(res.target),win,"TARGET  +1.0×ATR"); hl(Y(res.stop),loss,"STOP  −"+barrier.stopMult.toFixed(1)+"×ATR");
+    ctx.strokeStyle=muted;ctx.globalAlpha=.7;ctx.lineWidth=1;ctx.setLineDash([2,3]);ctx.beginPath();ctx.moveTo(0,Y(e));ctx.lineTo(w,Y(e));ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+    ctx.fillStyle=muted;ctx.font="600 11px "+css("--font-mono");ctx.fillText("ENTRY (next open)",6,Y(e)-3);
+    ctx.strokeStyle=accent;ctx.lineWidth=1.5;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(X(arr.length-1),0);ctx.lineTo(X(arr.length-1),h);ctx.stroke();ctx.setLineDash([]);
+    var shown=Math.min(arr.length,Math.max(1,Math.floor(upto)));
+    ctx.strokeStyle=ink;ctx.lineWidth=2;ctx.lineJoin="round";ctx.beginPath();
+    for(var i=0;i<shown;i++){var x=X(i),y=Y(arr[i]); i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke();
+    if(shown>=1){ctx.fillStyle=accent;ctx.beginPath();ctx.arc(X(shown-1),Y(arr[shown-1]),4,0,7);ctx.fill();}
+    if(shown-1>=res.idx){ var isWin=res.outcome==="win"||res.outcome==="time-win",hx=X(res.idx),hy=Y(arr[res.idx]);
+      ctx.fillStyle=isWin?win:loss;ctx.beginPath();ctx.arc(hx,hy,6,0,7);ctx.fill();ctx.globalAlpha=.3;ctx.beginPath();ctx.arc(hx,hy,12,0,7);ctx.fill();ctx.globalAlpha=1; }
+  }
+  function verdictB(res){ var v=el("barrierVerdict"),m={
+    "win":["ok","✓ TARGET hit first → label = 1 (win)."],"loss":["bad","✗ STOP hit first → label = 0 (loss)."],
+    "time-win":["ok","⧗ Time barrier reached while up → label = 1."],"time-loss":["bad","⧗ Time barrier reached while down → label = 0."]}[res.outcome];
+    v.className="verdict "+m[0]; v.textContent=m[1]; }
+  function playB(){ if(!curPath) newScen(); if(barrier.raf) cancelAnimationFrame(barrier.raf);
+    barrier.stopMult=+el("stopW").value; var res=evalB(); barrier.res=res; var target=res.idx+1;
+    if(reduce){drawB(res,curPath.arr.length);verdictB(res);return;}
+    barrier.t=0; el("barrierVerdict").className="verdict"; el("barrierVerdict").textContent="Simulating…";
+    (function step(){ barrier.t+=1; drawB(res,barrier.t); if(barrier.t<target) barrier.raf=requestAnimationFrame(step); else{drawB(res,Math.max(target,barrier.t));verdictB(res);} })();
+  }
+  function newScen(){ curPath=genPath(scen[si%scen.length]); si++; barrier.stopMult=+el("stopW").value; playB(); }
+  el("barrierPlay").addEventListener("click",playB);
+  el("barrierNext").addEventListener("click",newScen);
+  el("stopW").addEventListener("input",function(){ el("stopVal").textContent=(+this.value).toFixed(1); });
+
+  /* ===== CALIBRATION ===== */
+  var calibC=el("calibCanvas"), calibShow=true;
+  function drawCalib(){ if(!calibC) return; var d=size(calibC),ctx=d.ctx,w=d.w,h=d.h; ctx.clearRect(0,0,w,h);
+    var muted=css("--muted"),loss=css("--loss"),win=css("--win"),border=css("--border-strong"),ink=css("--ink");
+    var amt=+el("calAmt").value; el("calVal").textContent=amt>1?"over-confident":(amt<-1?"under-confident":"nearly perfect");
+    var m=42,pl=m,pt=14,W=w-m-14,H=h-pt-m;
+    function X(p){return pl+p*W;} function Y(p){return pt+(1-p)*H;}
+    ctx.strokeStyle=border;ctx.lineWidth=1;ctx.strokeRect(pl,pt,W,H);
+    ctx.strokeStyle=muted;ctx.setLineDash([4,4]);ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(X(0),Y(0));ctx.lineTo(X(1),Y(1));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=muted;ctx.font="600 10px "+css("--font-mono");ctx.textAlign="center";
+    ctx.fillText("predicted probability",pl+W/2,h-8);
+    ctx.save();ctx.translate(12,pt+H/2);ctx.rotate(-Math.PI/2);ctx.fillText("actual frequency",0,0);ctx.restore();
+    // miscalibration: warp true freq. over-confident (amt>0): high preds overstate.
+    function trueFreq(p){ var k=amt/8; // -1..1
+      // pull toward 0.5 when over-confident, push away when under (bowed, never fully flat)
+      return Math.max(0.02,Math.min(0.98, p + k*(0.5 - p)*1.05 )); }
+    var bins=11, raw=[], cal=[];
+    for(var i=0;i<bins;i++){ var p=i/(bins-1); raw.push({p:p,f:trueFreq(p)}); }
+    // isotonic-ish calibrated = maps predicted->trueFreq inverse so points land on diagonal:
+    // after calibration the displayed empirical freq ≈ predicted (diagonal), shown as a step fn
+    for(i=0;i<bins;i++){ var p2=i/(bins-1); cal.push({p:p2,f:p2}); }
+    // draw raw curve (red)
+    ctx.strokeStyle=loss;ctx.lineWidth=2;ctx.beginPath();
+    raw.forEach(function(o,i){ var x=X(o.p),y=Y(o.f); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke();
+    raw.forEach(function(o){ ctx.fillStyle=loss;ctx.beginPath();ctx.arc(X(o.p),Y(o.f),3,0,7);ctx.fill(); });
+    if(calibShow){
+      // isotonic step function (amber) mapping raw->calibrated (monotone staircase)
+      ctx.strokeStyle=css("--accent");ctx.globalAlpha=.55;ctx.lineWidth=1.5;ctx.beginPath();
+      for(i=0;i<bins;i++){ var xp=X(raw[i].p); var yc=Y(cal[i].f);
+        if(i===0)ctx.moveTo(xp,yc); else { ctx.lineTo(X(raw[i-1].p),yc); ctx.lineTo(xp,yc);} } ctx.stroke(); ctx.globalAlpha=1;
+      // calibrated points (green) on diagonal
+      ctx.strokeStyle=win;ctx.lineWidth=2;ctx.beginPath();
+      cal.forEach(function(o,i){var x=X(o.p),y=Y(o.f); i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+      cal.forEach(function(o){ ctx.fillStyle=win;ctx.beginPath();ctx.arc(X(o.p),Y(o.f),3,0,7);ctx.fill(); });
+    }
+  }
+  el("calibToggle").addEventListener("click",function(){ calibShow=!calibShow; this.textContent=calibShow?"Show calibrated ✓":"Show calibrated"; drawCalib(); });
+  el("calAmt").addEventListener("input",drawCalib);
+
+  /* ===== CONFORMAL GATE ===== */
+  var confC=el("conformalCanvas"), confState=null, confRaf=null;
+  function seededVals(day){ // deterministic-ish P(win) draws per day, no Math.random persistence issue
+    var arr=[]; for(var k=0;k<3;k++){ var s=Math.sin(day*12.9898+k*78.233)*43758.5453; s=s-Math.floor(s);
+      arr.push(0.55+s*0.42); } return arr; } // p in [0.55,0.97]
+  function winFor(p,day,k){ var s=Math.sin(day*3.17+k*9.7+p*5.0)*10000; s=s-Math.floor(s); return s < p ? 1:0; } // win w.p. ~p (calibrated)
+  function drawConf(state){ var d=size(confC),ctx=d.ctx,w=d.w,h=d.h; ctx.clearRect(0,0,w,h);
+    var win=css("--win"),loss=css("--loss"),muted=css("--muted"),accent=css("--accent"),border=css("--border-strong");
+    var m=34,pl=m,pt=14,W=w-m-12,H=h-pt-28, DAYS=60;
+    function X(day){return pl+day/(DAYS-1)*W;} function Y(p){return pt+(1-(p-0.5)/0.5)*H;} // p 0.5..1
+    ctx.strokeStyle=border;ctx.lineWidth=1;ctx.strokeRect(pl,pt,W,H);
+    ctx.fillStyle=muted;ctx.font="600 10px "+css("--font-mono");ctx.textAlign="right";ctx.textBaseline="middle";
+    [0.5,0.75,1.0].forEach(function(p){ ctx.fillText(p.toFixed(2),pl-5,Y(p)); ctx.strokeStyle=border;ctx.globalAlpha=.4;ctx.beginPath();ctx.moveTo(pl,Y(p));ctx.lineTo(pl+W,Y(p));ctx.stroke();ctx.globalAlpha=1;});
+    ctx.textAlign="center";ctx.fillText("day →",pl+W/2,h-6);
+    // dots
+    for(var i=0;i<=state.day && i<DAYS;i++){ var vals=seededVals(i), tau=state.tauHist[i]!==undefined?state.tauHist[i]:0.84;
+      for(var k=0;k<vals.length;k++){ var p=vals[k]; var fired=p>=tau;
+        var color=muted; if(fired){ color=winFor(p,i,k)?win:loss; }
+        ctx.fillStyle=color; ctx.globalAlpha=fired?1:0.5; ctx.beginPath();ctx.arc(X(i),Y(p),fired?3.5:2.4,0,7);ctx.fill(); } }
+    ctx.globalAlpha=1;
+    // tau line
+    ctx.strokeStyle=accent;ctx.lineWidth=2.2;ctx.beginPath();
+    for(i=0;i<=state.day && i<DAYS;i++){ var x=X(i),y=Y(state.tauHist[i]); i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke();
+  }
+  function stepConf(state){ var alpha=1-(+el("confAlpha").value)/100, gamma=0.06; // gamma raised for on-screen convergence
+    var vals=seededVals(state.day), tau=state.tau, fired=[];
+    for(var k=0;k<vals.length;k++){ if(vals[k]>=tau) fired.push(winFor(vals[k],state.day,k)); }
+    state.fired+=fired.length; fired.forEach(function(w){ state.wins+=w; });
+    if(fired.length){ var err=1-fired.reduce(function(a,b){return a+b;},0)/fired.length;
+      tau=Math.max(0.5,Math.min(0.995, tau+gamma*(err-alpha))); }
+    state.tau=tau; state.tauHist[state.day]=tau;
+    el("confTau").textContent=tau.toFixed(3); el("confFired").textContent=state.fired;
+    el("confWR").textContent=state.fired?(state.wins/state.fired*100).toFixed(0)+"%":"—";
+    el("confTarget").textContent=(+el("confAlpha").value);
+    state.day++;
+  }
+  function runConf(){ if(confRaf) cancelAnimationFrame(confRaf);
+    confState={day:0,tau:0.84,tauHist:{0:0.84},fired:0,wins:0};
+    el("confAlpha").disabled=false;
+    if(reduce){ for(var i=0;i<60;i++) stepConf(confState); drawConf(confState); return; }
+    (function loop(){ if(confState.day<60){ stepConf(confState); drawConf(confState); confRaf=setTimeout(function(){requestAnimationFrame(loop);},70); } })();
+  }
+  el("confPlay").addEventListener("click",runConf);
+  el("confAlpha").addEventListener("input",function(){ el("confTarget").textContent=this.value; });
+
+  /* ===== WALK-FORWARD ===== */
+  var wf=el("wfCanvas"), wfP=0, wfRaf=null;
+  function drawWF(prog){ var d=size(wf),ctx=d.ctx,w=d.w,h=d.h; ctx.clearRect(0,0,w,h);
+    var info=css("--info"),accent=css("--accent"),win=css("--win"),muted=css("--muted"),surf=css("--surface-2");
+    var folds=5,rowH=(h-20)/folds,cells=20,cw=(w-90)/cells; ctx.font="600 10px "+css("--font-mono");
+    for(var f=0;f<folds;f++){ var y=10+f*rowH, vis=f<prog, alpha=vis?1:(f===Math.floor(prog)?(prog-Math.floor(prog)):0.12);
+      ctx.globalAlpha=Math.max(0.12,alpha);
+      var trainEnd=6+f*2, embargo=trainEnd, testStart=trainEnd+1, testEnd=testStart+2;
+      for(var c=0;c<cells;c++){ var x=70+c*cw,col; if(c<trainEnd)col=info; else if(c===embargo)col=accent; else if(c>=testStart&&c<testEnd)col=win; else col=surf;
+        ctx.fillStyle=col; ctx.fillRect(x,y+3,cw-2,rowH-8); }
+      ctx.globalAlpha=Math.max(0.3,alpha);ctx.fillStyle=muted;ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText("fold "+(f+1),8,y+rowH/2);ctx.globalAlpha=1; }
+    ctx.strokeStyle=muted;ctx.globalAlpha=.6;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(70,h-4);ctx.lineTo(w-6,h-4);ctx.stroke();
+    ctx.globalAlpha=1;ctx.fillStyle=muted;ctx.textAlign="right";ctx.fillText("time →",w-6,h-12);
+  }
+  function animWF(){ if(reduce){drawWF(5);return;} if(wfP<5){wfP+=0.03;drawWF(wfP);wfRaf=requestAnimationFrame(animWF);} else drawWF(5); }
+  el("wfPlay").addEventListener("click",function(){ if(wfRaf)cancelAnimationFrame(wfRaf); wfP=0; animWF(); });
+
+  /* ===== GLOSSARY ===== */
+  var TERMS=[
+    ["NSE","market","India's National Stock Exchange — the exchange this system trades signals for."],
+    ["Bhavcopy","data","NSE's official end-of-day file for the whole market (every symbol's OHLCV + delivery %)."],
+    ["EOD","data","End of day — data finalized after the market closes (NSE publishes ~18:30 IST)."],
+    ["Delivery %","market","Share of a day's volume that was actually delivered (not intraday-squared) — a conviction proxy."],
+    ["F&O","market","Futures &amp; Options — the derivatives segment; source of open-interest and basis features."],
+    ["OI","market","Open Interest — number of derivative contracts outstanding; changes hint at positioning."],
+    ["Basis","market","The gap between a future's price and its spot price."],
+    ["FII / DII","market","Foreign / Domestic Institutional Investors — their net buying/selling is a flow signal."],
+    ["ATR","quant","Average True Range — a stock's typical daily move. Barriers are sized in multiples of ATR."],
+    ["RSI","quant","Relative Strength Index — a momentum oscillator (0–100)."],
+    ["Turnover","quant","Price × volume traded — the liquidity metric used to rank the universe."],
+    ["PIT","mlops","Point-in-time — a feature dated D may use only data available on/before D. No peeking ahead."],
+    ["Lookahead / leakage","mlops","Accidentally training on future information — the top cause of backtests that fail live."],
+    ["Survivorship bias","mlops","Judging history using today's winners; avoided by a trailing, survivorship-free universe."],
+    ["Triple-barrier","quant","Labeling by simulating the trade: target, stop, or time barrier hit first decides win/loss."],
+    ["Expectancy","quant","Average profit per trade after costs — the number that actually pays you."],
+    ["Win rate","quant","Fraction of emitted signals that win. Engineered by barrier geometry, nudged by the model."],
+    ["Calibration","mlops","Making a model's probability honest: a '70%' should win ~70% of the time."],
+    ["Isotonic regression","mlops","A monotonic step-function calibrator that maps raw scores to true frequencies."],
+    ["Brier score","mlops","Mean squared error of probabilistic predictions — lower is better-calibrated."],
+    ["Conformal / ACI","mlops","Adaptive Conformal Inference — a self-adjusting threshold that holds a target error rate."],
+    ["Coverage","mlops","The guarantee a conformal method targets (e.g. 80% of fired signals win)."],
+    ["SHAP","mlops","Shapley-value attributions — each feature's fair contribution to one prediction (the 'why')."],
+    ["LightGBM","model","A fast gradient-boosted decision-tree library — the core P(win) classifier."],
+    ["Gradient boosting","model","Many shallow trees, each correcting the previous ones' errors, summed into one model."],
+    ["CatBoost","model","A boosting library strong on categorical features — used on the flow channel."],
+    ["Optuna","mlops","A hyperparameter-optimization library; tuned here only on an inner training split."],
+    ["Walk-forward","mlops","Validation that always trains on the past and tests on the immediate future, rolling forward."],
+    ["Purge / embargo","mlops","Removing train rows whose labels overlap the test window, plus a gap — kills label leakage."],
+    ["AUC","mlops","Area under the ROC curve — ranking quality; 0.5 = no skill. &gt;0.80 here trips a leakage alarm."],
+    ["Drift","mlops","When live data's distribution moves away from training data — a model's silent killer."],
+    ["Evidently","mlops","The drift-detection library; a breach can force recalibration or halt trading."],
+    ["MLflow","mlops","Experiment tracking + a model registry with Staging/Production stages and rollback."],
+    ["DVC","mlops","Data Version Control — versions large data/model files alongside git's code."],
+    ["Model registry","mlops","A versioned catalog of models with promotion stages; the API serves 'Production'."],
+    ["FastAPI","mlops","The Python web framework serving the model behind an API-key-protected interface."],
+    ["Ollama / Granite","mlops","A local LLM runner + IBM's Granite model, used to narrate signals in plain English."],
+    ["FinBERT","model","A finance-tuned BERT model that scores news-headline sentiment."],
+    ["GDELT","data","A global news database queried for per-stock headlines."],
+    ["Gate","mlops","A pre-registered pass/fail test on a frozen metric — the project's core decision instrument."],
+    ["KILL","mlops","A gate's honest 'no'. Here: 0 of 48 geometry cells passed, so the project stopped."]
+  ];
+  (function buildGloss(){ var grid=el("glossGrid"); if(!grid) return;
+    TERMS.sort(function(a,b){return a[0].toLowerCase()<b[0].toLowerCase()?-1:1;});
+    grid.innerHTML=TERMS.map(function(t){ return '<div class="term" data-s="'+(t[0]+" "+t[2]).toLowerCase()+'"><div class="t">'+t[0]+'<span class="k2">'+t[1]+'</span></div><div class="dfn">'+t[2]+'</div></div>'; }).join("");
+  })();
+  el("glossSearch").addEventListener("input",function(){ var q=this.value.toLowerCase().trim(), n=0;
+    document.querySelectorAll("#glossGrid .term").forEach(function(c){ var hit=c.getAttribute("data-s").indexOf(q)>=0; c.style.display=hit?"":"none"; if(hit)n++; });
+    el("glossEmpty").style.display=n?"none":"block";
+  });
+
+  /* ===== BOOT + repaint ===== */
+  function repaintAll(){ drawHero();drawLifecycle();drawWF(wfP||0); if(curPath)drawB(barrier.res||evalB(),curPath.arr.length); drawCalib(); if(confState)drawConf(confState); else drawConf({day:0,tau:0.84,tauHist:{0:0.84},fired:0,wins:0}); }
+  drawHero();drawLifecycle();drawWF(0);drawCalib();drawConf({day:0,tau:0.84,tauHist:{0:0.84},fired:0,wins:0});
+  animHero();animLifecycle();
+  function once(id,fn){ var e=el(id); if(!e)return; var o=new IntersectionObserver(function(en){en.forEach(function(x){ if(x.isIntersecting){fn();o.disconnect();} });},{threshold:0.3}); o.observe(e); }
+  once("barrierCanvas",newScen); once("wfCanvas",function(){wfP=0;animWF();}); once("conformalCanvas",runConf);
+  var rz; window.addEventListener("resize",function(){ clearTimeout(rz); rz=setTimeout(repaintAll,150); });
+})();
+</script>
+</body>
+</html>

@@ -1,8 +1,0 @@
-{
-  "horizon": "next_day",
-  "trained_through": "2026-06-19",
-  "n_rows": 17228,
-  "schema_version": "daily-v1",
-  "bundle_dir": "C:\\Projects\\Alkason-MarketPipelines\\models\\daily\\next_day",
-  "trained_at": "2026-06-29T11:11:03.956100"
-}

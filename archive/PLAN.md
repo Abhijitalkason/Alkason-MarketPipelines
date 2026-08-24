@@ -1,3 +1,5 @@
+> ⚠️ **EXPIRED — this plan is no longer active and has been superseded. Please check the current plan: [Aug26Plan.md](../Aug26Plan.md).**
+
 # AI-MLOps Stock Prediction System — Project Plan (2026)
 
 > **Project:** End-to-end production-grade stock prediction system for NSE/BSE Indian stocks  

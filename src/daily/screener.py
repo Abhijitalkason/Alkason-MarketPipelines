@@ -50,7 +50,7 @@ def _humanize(why: dict[str, float]) -> list[str]:
     return out
 
 
-def screen_day(day: date | None = None, horizon: str = "next_day",
+def screen_day(day: date | None = None, horizon: str = "swing_1_5d",
                top_n: int | None = None, df_panels: dict | None = None,
                trace=None) -> pd.DataFrame:
     """Top-N daily picks for `horizon`. Returns columns

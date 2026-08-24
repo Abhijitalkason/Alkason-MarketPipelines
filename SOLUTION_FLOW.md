@@ -10,7 +10,7 @@
 > in this document is the *designed* flow that was never entered — it is
 > documented here for completeness and for any future re-contract.
 >
-> **Authoritative spec:** [PLAN_v6.md](PLAN_v6.md). Lineage & history: [README.md](README.md).
+> **Authoritative spec:** [PLAN_v6.md](archive/PLAN_v6.md). Lineage & history: [README.md](README.md).
 
 ---
 
@@ -20,7 +20,7 @@ This is **not** "predict every stock's direction." It is a **selective** system:
 stay silent unless a calibrated probability clears a gate, and **engineer the win
 rate with barrier geometry** rather than demanding it from prediction.
 
-Two numbers define success (the frozen contract, [PLAN_v6.md](PLAN_v6.md#L94-L104)):
+Two numbers define success (the frozen contract, [PLAN_v6.md](archive/PLAN_v6.md#L94-L104)):
 
 | Quantity | Contract |
 |---|---|
@@ -48,7 +48,7 @@ Raw exchange data ─► [PHASE 0] measure feasibility ─► GATE (GO/KILL)
 ## 1. Lineage — why the flow is shaped this way
 
 Each prior version violated one rule; v6's flow is the accumulated response
-([PLAN_v6.md §1](PLAN_v6.md#L36-L42), [README.md](README.md#L105-L110)).
+([PLAN_v6.md §1](archive/PLAN_v6.md#L36-L42), [README.md](README.md#L105-L110)).
 
 | Plan | Horizon | Died because | Flow fix carried into v6 |
 |---|---|---|---|
@@ -109,7 +109,7 @@ and a signal decided at day D's close never sees D+1.
 
 **Goal:** measure — not assume — whether an 80% win rate can be engineered by
 geometry, long-only, at ≤5-day holds, and price the model edge required to beat
-costs. Compute only; **no system is built.** ([PLAN_v6.md §4](PLAN_v6.md#L107-L239))
+costs. Compute only; **no system is built.** ([PLAN_v6.md §4](archive/PLAN_v6.md#L107-L239))
 
 ### 3.1 Execution order (F21: cost curve is frozen *before* any cell is scored)
 
@@ -188,7 +188,7 @@ this point.**
 
 ## 4. PHASE 1 — Conditional Build ⛔ *never entered (Phase 0 killed the premise)*
 
-This is the flow that a **GO** would have unlocked ([PLAN_v6.md §5](PLAN_v6.md#L243-L288)).
+This is the flow that a **GO** would have unlocked ([PLAN_v6.md §5](archive/PLAN_v6.md#L243-L288)).
 Every module below already exists (carried from v4) — only re-parameterized to the
 daily horizon.
 
@@ -215,7 +215,7 @@ flowchart LR
 | Backtest | [src/intraday/backtester.py](src/intraday/backtester.py) | purged/expanding walk-forward, day-clustered CI, T+1 rotation |
 | Gate 3 | [src/intraday/gates.py](src/intraday/gates.py) | pre-registered acceptance, **scoreable only at ≥300 pooled OOS trades** |
 
-**Risk layer (overnight-specific, [PLAN_v6.md §5.4](PLAN_v6.md#L267-L276)):**
+**Risk layer (overnight-specific, [PLAN_v6.md §5.4](archive/PLAN_v6.md#L267-L276)):**
 gap-stressed sizing (a stop is never treated as a max loss), event blackout
 around scheduled results, T+1 capital-rotation accounting — all in
 [src/intraday/risk.py](src/intraday/risk.py).
@@ -289,5 +289,5 @@ diffs were regeneration timestamps.
 
 ---
 
-*Generated 2026-07-10. Spec of record: [PLAN_v6.md](PLAN_v6.md). This document
+*Generated 2026-07-10. Spec of record: [PLAN_v6.md](archive/PLAN_v6.md). This document
 describes flow and status; if the two ever disagree, PLAN_v6.md wins.*

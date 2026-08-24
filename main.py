@@ -32,6 +32,24 @@ def _today() -> date:
     return today_ist()
 
 
+def _pick_verdict(prob: float, actionable: bool, strong_min: float) -> tuple[str, str, str]:
+    """Final-status verdict for one pick → (action, colour, label). This is a
+    LONG-ONLY BUY watchlist, so the call is BUY (act) vs HOLD (watch) — SELL is
+    never emitted here (that is the per-stock Analyzer's job). Colours are the
+    real-money confidence signal:
+      green  = high confidence — a strong signal, calibrated P(win) ≥ strong_min;
+      yellow = moderate — the list is actionable (after-cost backtest gate passed)
+               but the pick is below the strong bar;
+      red    = low / no proven edge — not actionable or P near the ~0.50 base rate,
+               i.e. watch only, do NOT size up.
+    """
+    if prob >= strong_min:
+        return "BUY", "green", f"high confidence — strong signal (P≥{strong_min:.2f})"
+    if actionable:
+        return "BUY", "yellow", "moderate — actionable (after-cost gate passed), below strong bar"
+    return "HOLD", "red", "low / no proven edge — watch only, do not size up"
+
+
 # ── data ──────────────────────────────────────────────────────────────
 
 def cmd_backfill(args):
@@ -451,9 +469,40 @@ def cmd_daily_pipeline(args):
             "for full evidence, news and the 1–5 day trade plan.",
             "Track the pick's honesty over time: python main.py --mode daily-scoreboard.",
         ]
+        # ── enrich the final status so the UI shows the full, real-money-safe
+        # recommendation card (action · confidence colour · buy/target/stop ·
+        # duration · data provenance) instead of a bare one-liner ──────────────
+        from src.daily import now_ist
+        strong_min = float(_ldc()["listing"].get("top_pick", {}).get("strong_signal_min_prob", 0.80))
+
+        def _enrich(p: dict) -> dict:
+            action, color, clabel = _pick_verdict(p["prob"], bool(p.get("actionable")), strong_min)
+            return {"rank": p.get("rank"), "symbol": p["symbol"],
+                    "direction": p.get("direction", "LONG"), "prob": p["prob"],
+                    "action": action, "color": color, "confidence_label": clabel,
+                    "confidence_pct": round(p["prob"] * 100, 1),
+                    "buy_price": p.get("ref_close"), "stop_price": p.get("stop_price"),
+                    "target_price": p.get("target_price"),
+                    "duration_days": p.get("max_hold_days"), "qty_at_1L": p.get("qty_ref")}
+
+        enriched_picks = sorted(
+            (_enrich(p) for b in out["horizons"].values() for p in b["picks"]),
+            key=lambda x: (x["rank"] is None, x["rank"]))
+        enriched_tp = ({**_enrich(tp), "tier": tp["tier"], "why": tp.get("why", [])}
+                       if tp else None)
+        provenance = {
+            "session_date": str(eff),
+            "used_upstox_live": live_injected,
+            "captured_at": now_ist().isoformat(timespec="seconds"),
+            "source": ("Upstox live intraday snapshot — PROVISIONAL (current price, NOT the "
+                       "final close; delivery %/OI absent)" if live_injected else
+                       "NSE EOD official close — FINAL (today's session)" if fetched_today else
+                       "NSE EOD official close — last available session (today not published yet)"),
+        }
         result = {"day": str(eff),
-                  "top_pick": ({"symbol": tp["symbol"], "direction": tp["direction"],
-                                "prob": tp["prob"], "tier": tp["tier"]} if tp else None),
+                  "data_provenance": provenance,
+                  "top_pick": enriched_tp,
+                  "picks": enriched_picks,
                   "n_picks": n_picks, "n_strong_signals": len(strong),
                   "summary": {
                       "headline": (f"Session {eff}: top pick {tp['symbol']} ({tp['direction']}), "

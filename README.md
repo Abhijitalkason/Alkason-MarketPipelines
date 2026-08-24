@@ -2,10 +2,10 @@
 
 A 1–2 hour intraday **selective** trading-signal system for NSE large caps.
 Entries 09:30–11:00 IST, time barrier entry+2h, hard square-off 14:45, always
-flat overnight. Current spec: [PLAN_v4.md](PLAN_v4.md) (targets, regime/news
-channel, kill criterion) + [PLAN_v4_STATUS.md](PLAN_v4_STATUS.md) (implementation
-status, executed results, decision-phase runbook). [PLAN_v3.md](PLAN_v3.md) /
-[v3_supplementry.md](v3_supplementry.md) remain the architecture reference.
+flat overnight. Current spec: [PLAN_v4.md](archive/PLAN_v4.md) (targets, regime/news
+channel, kill criterion) + [PLAN_v4_STATUS.md](archive/PLAN_v4_STATUS.md) (implementation
+status, executed results, decision-phase runbook). [PLAN_v3.md](archive/PLAN_v3.md) /
+[v3_supplementry.md](archive/v3_supplementry.md) remain the architecture reference.
 
 **Stack:** Upstox/NSE data · pre-open global/macro regime channel (yfinance) +
 forward-only news sentiment (RSS + GDELT, FinBERT) · LightGBM (price) + CatBoost
@@ -104,7 +104,7 @@ approval exists**.
 
 ## History
 
-[PLAN.md](PLAN.md) (v1, daily 5-class system) and `STATUS_2026-06-03.md` are
+[PLAN.md](archive/PLAN.md) (v1, daily 5-class system) and `STATUS_2026-06-03.md` are
 retained as historical record only. v1 was fully decommissioned (its source
 tree, models, sentiment/news pipeline, and config removed); see
-[v3_supplementry.md](v3_supplementry.md) §16.
+[v3_supplementry.md](archive/v3_supplementry.md) §16.

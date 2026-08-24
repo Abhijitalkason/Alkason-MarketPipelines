@@ -1,3 +1,5 @@
+> ⚠️ **EXPIRED — this plan is no longer active and has been superseded. Please check the current plan: [Aug26Plan.md](../Aug26Plan.md).**
+
 # Stock Prediction System — Plain English Guide
 
 > **Who is this for?** Anyone who wants to understand what this system does and how it works — no coding knowledge needed.

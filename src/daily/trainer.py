@@ -48,7 +48,7 @@ def _feature_flags() -> dict:
             ("fno_enabled", "global_enabled", "macro_enabled", "sentiment_enabled")}
 
 
-def train_production(horizon: str = "next_day", end_day: date | None = None,
+def train_production(horizon: str = "swing_1_5d", end_day: date | None = None,
                      train_months: int | None = None, tune: bool | None = None) -> TrainResult:
     cfg = load_daily_config()
     end_day = end_day or today_ist()
@@ -84,7 +84,7 @@ def train_production(horizon: str = "next_day", end_day: date | None = None,
     return meta
 
 
-def load_bundle(horizon: str = "next_day") -> tuple[DailyModel, Blender, dict]:
+def load_bundle(horizon: str = "swing_1_5d") -> tuple[DailyModel, Blender, dict]:
     bd = _bundle_dir(horizon)
     mp = bd / "model.joblib"
     if not mp.exists():

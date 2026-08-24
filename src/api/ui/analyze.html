@@ -25,6 +25,18 @@
   .pbanner.idle{background:#161b22} .pbanner.running{background:#12233b;border-color:var(--accent)}
   .pbanner.completed{background:#0f2417;border-color:#2ea04366}
   .pbanner.failed,.pbanner.stopped,.pbanner.stopped_unexpectedly,.pbanner.stalled{background:#2a1416;border-color:#f8514966}
+  /* final recommendation card (real-money-safe status) */
+  .rprov{font-size:12.5px;margin:10px 0 4px;padding:8px 11px;border-radius:8px;background:#0d1117;border:1px solid var(--line)}
+  .rprov.live{border-color:#d2992288;background:#231c10}
+  .rlegend{font-size:11px;color:var(--dim);margin:8px 0 2px;line-height:1.55}
+  .rtable{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  .rtable th{text-align:left;color:var(--dim);font-weight:600;padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .rtable td{padding:6px 8px;border-bottom:1px solid #21262d;white-space:nowrap}
+  .rtable tr:hover td{background:#161b22}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:.02em}
+  .badge.green{background:#0f2417;color:#3fb950;border:1px solid #2ea04366}
+  .badge.yellow{background:#231c10;color:#e3b341;border:1px solid #d2992288}
+  .badge.red{background:#2a1416;color:#ff7b72;border:1px solid #f8514988}
   .pstep{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
   .pstep:last-child{border-bottom:0}
   .pdot{flex:none;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
@@ -138,6 +150,8 @@
       <div class="big" id="pbanner-big">Idle — press ▶ Start new run</div>
       <div class="sm" id="pbanner-sm"></div>
     </div>
+
+    <div id="pipe-results"></div>
 
     <div id="pipe-steps"></div>
 
@@ -309,10 +323,12 @@ function renderPipeline(d){
     sm=cur?(STEP_INFO[cur.name]?STEP_INFO[cur.name].title:cur.label)+"…":"";
   }else if(c&&state==="completed"&&c.result){
     const tp=c.result.top_pick;
-    big=tp?`✅ Done — top pick ${tp.symbol} (P=${tp.prob})`:"✅ Done — no pick produced";
-    sm=`for the session of ${c.result.day} · ${c.result.n_strong_signals} strong signal(s)`;
+    big=tp?`✅ Done — ${tp.symbol}: ${tp.action||"—"} (${tp.confidence_pct!=null?tp.confidence_pct+"% confidence":"P="+tp.prob})`
+          :"✅ Done — no pick produced";
+    sm=`session ${c.result.day} · ${c.result.n_picks||0} picks · ${c.result.n_strong_signals} strong signal(s)`;
   }else if(c&&c.error){ sm=c.error.slice(0,140); }
   $("pbanner-big").textContent=big; $("pbanner-sm").textContent=sm;
+  renderResults(c);
 
   // the five stage cards
   if(!c){
@@ -353,6 +369,39 @@ function renderPipeline(d){
     return `<div>${(h.started||"").replace("T"," ")} — <b>${h.state}</b>`+
       `${tp?" → "+tp.symbol+" P="+tp.prob:""}${h.error?" ("+h.error.slice(0,50)+")":""}</div>`;
   }).join("")||"<div class='dim'>none</div>";
+}
+// ── final recommendation card: action · confidence colour · buy/target/stop ·
+//    duration · data provenance (real-money-safe; feature 2026-08-04) ──────────
+function renderResults(c){
+  const box=$("pipe-results");
+  if(!(c&&c.derived_state==="completed"&&c.result)){box.innerHTML="";return;}
+  const r=c.result, prov=r.data_provenance, picks=r.picks||[];
+  const money=v=>v==null?"—":"₹"+Number(v).toLocaleString("en-IN");
+  let provHtml="";
+  if(prov){
+    const live=prov.used_upstox_live;
+    provHtml=`<div class="rprov ${live?"live":""}"><b>📅 Data used for this prediction:</b> ${prov.source}`+
+      `<br><span class="dim">session ${prov.session_date} · generated ${prov.captured_at} · `+
+      (live?"⚠ LIVE Upstox intraday price (provisional — NOT the final close)"
+          :"final EOD close — <b>not</b> a live Upstox intraday price")+`</span></div>`;
+  }
+  if(!picks.length){box.innerHTML=provHtml+"<div class='dim' style='margin-top:6px'>No picks produced.</div>";return;}
+  const rows=picks.map(p=>`<tr>
+     <td>${p.rank}</td><td><b>${p.symbol}</b></td>
+     <td><span class="badge ${p.color}" title="${p.confidence_label||""}">${p.action}</span></td>
+     <td>${p.confidence_pct}%</td>
+     <td>${money(p.buy_price)}</td>
+     <td class="pos">${money(p.target_price)}</td>
+     <td class="neg">${money(p.stop_price)}</td>
+     <td>${p.duration_days!=null?p.duration_days+" d":"—"}</td></tr>`).join("");
+  box.innerHTML=provHtml+
+    `<table class="rtable"><thead><tr><th>#</th><th>Stock</th><th>Call</th>`+
+    `<th>Confidence</th><th>Buy&nbsp;≈</th><th>Target</th><th>Stop</th><th>Hold</th></tr></thead>`+
+    `<tbody>${rows}</tbody></table>`+
+    `<div class="rlegend">🟢 <b>BUY</b> high confidence (strong signal, P≥80%) · `+
+    `🟡 <b>BUY</b> moderate (list actionable) · 🔴 <b>HOLD</b> low / no proven edge — watch only.<br>`+
+    `Long-only <b>BUY watchlist</b> — no SELL signals here; use the Analyzer (left) for a per-stock BUY/HOLD/SELL. `+
+    `"Buy≈" is the reference close — the real entry is the next session's open. Verify before acting — real money.</div>`;
 }
 loadPipeline();
 

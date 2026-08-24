@@ -1,3 +1,5 @@
+> ⚠️ **EXPIRED — this plan is no longer active and has been superseded. Please check the current plan: [Aug26Plan.md](../Aug26Plan.md).**
+
 # PLAN v6 — Daily/Swing Selective Signal System (1–5 Day Holds, NSE) — **v2.1**
 
 > **Project:** Selective trading-signal system for NSE stocks at the 1–5 day (swing) horizon — **long-only in the cash/delivery segment** (see §2, review finding F3)

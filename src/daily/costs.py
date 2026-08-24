@@ -2,7 +2,7 @@
 itself ships on predictive quality, costs gate the 'actionable' label).
 
 Two profiles:
-  delivery  (next_day/swing): STT 0.1% on BOTH sides (delivery equity), exchange/
+  delivery  (swing): STT 0.1% on BOTH sides (delivery equity), exchange/
             SEBI/stamp/GST, a flat DP charge on the sell, and NO slippage/impact —
             we do not model microstructure at daily fills. This is the cheaper
             stack the plan calls for (vs the ~0.26% intraday drag that killed EV).

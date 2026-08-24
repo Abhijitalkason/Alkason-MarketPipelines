@@ -1,3 +1,5 @@
+> ⚠️ **EXPIRED — this plan is no longer active and has been superseded. Please check the current plan: [Aug26Plan.md](../Aug26Plan.md).**
+
 # PLAN v3 — Supplementary Implementation Specification (Production)
 
 > **Project:** Intraday (2–3 hour window) selective trading-signal system for NSE large caps

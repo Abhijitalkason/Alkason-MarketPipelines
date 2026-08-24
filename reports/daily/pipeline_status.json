@@ -1,24 +1,24 @@
 {
  "job": "daily-pipeline",
- "pid": 37966,
+ "pid": 50677,
  "state": "completed",
- "started": "2026-07-23T10:22:32",
- "updated": "2026-07-23T10:22:41",
+ "started": "2026-08-06T11:11:55",
+ "updated": "2026-08-06T11:12:06",
  "steps": [
   {
    "name": "fetch_bhavcopy",
    "label": "Fetch NSE EOD (bhavcopy)",
    "status": "done",
-   "one_liner": "partial \u2014 bhavcopy backfill: 1 non-holiday business days have NO files (first 10: [(datetime.date(2026, 7, 23), ['eq: HTTP 404 for https://nsearchives",
-   "started": "2026-07-23T10:22:32",
-   "seconds": 0.4
+   "one_liner": "partial \u2014 bhavcopy backfill: 1 non-holiday business days have NO files (first 10: [(datetime.date(2026, 8, 6), ['eq: HTTP 404 for https://nsearchives.",
+   "started": "2026-08-06T11:11:55",
+   "seconds": 0.3
   },
   {
    "name": "fetch_global",
    "label": "Fetch global/macro series (yfinance)",
    "status": "done",
    "one_liner": "10 global series refreshed",
-   "started": "2026-07-23T10:22:33",
+   "started": "2026-08-06T11:11:55",
    "seconds": 4.0
   },
   {
@@ -26,67 +26,249 @@
    "label": "Rebuild per-symbol daily panel",
    "status": "done",
    "one_liner": "100 symbols written",
-   "started": "2026-07-23T10:22:37",
-   "seconds": 2.1
+   "started": "2026-08-06T11:11:59",
+   "seconds": 2.7
+  },
+  {
+   "name": "live_snapshot",
+   "label": "Live Upstox snapshot (provisional today bar)",
+   "status": "done",
+   "one_liner": "provisional live bars for 99/100 symbols (PREVIEW \u2014 close not final, flow features absent)",
+   "started": "2026-08-06T11:12:02",
+   "seconds": 1.2
   },
   {
    "name": "generate_list",
    "label": "Score universe \u2192 picks + top pick",
    "status": "done",
-   "one_liner": "day 2026-07-22: top pick PAYTM P=0.500 \u00b7 0 strong signal(s)",
-   "started": "2026-07-23T10:22:39",
-   "seconds": 2.2
+   "one_liner": "day 2026-08-06: top pick SWIGGY P=0.474 \u00b7 0 strong signal(s)",
+   "started": "2026-08-06T11:12:03",
+   "seconds": 2.9
   },
   {
    "name": "notify",
    "label": "Desktop notification",
    "status": "done",
    "one_liner": "notification sent",
-   "started": "2026-07-23T10:22:41",
+   "started": "2026-08-06T11:12:06",
    "seconds": 0.1
   }
  ],
  "log_tail": [
-  "10:22:34 src.daily.global_data | global spx (^GSPC): 752 rows",
-  "10:22:34 src.daily.global_data | global ndx (^IXIC): 752 rows",
-  "10:22:34 src.daily.global_data | global dxy (DX-Y.NYB): 755 rows",
-  "10:22:35 src.daily.global_data | global us10y (^TNX): 752 rows",
-  "10:22:35 src.daily.global_data | global crude (CL=F): 755 rows",
-  "10:22:35 src.daily.global_data | global gold (GC=F): 755 rows",
-  "10:22:35 src.daily.global_data | global india_vix (^INDIAVIX): 734 rows",
-  "10:22:36 src.daily.global_data | global usdinr (INR=X): 779 rows",
-  "10:22:39 src.daily.panel | daily panel: 100 symbols written to /Users/abhijitbharatkakade/AI-MLOps-Solution/data/daily (2023-07-24..2026-07-23)",
-  "10:22:40 src.daily.features | daily features: 99 rows, present_share={'fno': 0.5858585858585857, 'global': 0.9090909090909088, 'macro': 0.0686868686868687, 'sentiment': 0.0}",
-  "10:22:41 src.daily.run_list | daily list 2026-07-22 swing_1_5d: 10 picks (actionable=False)"
+  "11:11:56 src.daily.global_data | global spx (^GSPC): 752 rows",
+  "11:11:56 src.daily.global_data | global ndx (^IXIC): 752 rows",
+  "11:11:57 src.daily.global_data | global dxy (DX-Y.NYB): 755 rows",
+  "11:11:57 src.daily.global_data | global us10y (^TNX): 752 rows",
+  "11:11:57 src.daily.global_data | global crude (CL=F): 755 rows",
+  "11:11:58 src.daily.global_data | global gold (GC=F): 755 rows",
+  "11:11:58 src.daily.global_data | global india_vix (^INDIAVIX): 734 rows",
+  "11:11:58 src.daily.global_data | global usdinr (INR=X): 779 rows",
+  "11:12:02 src.daily.panel | daily panel: 100 symbols written to /Users/abhijitbharatkakade/AI-MLOps-Solution/data/daily (2023-08-07..2026-08-06)",
+  "11:12:03 src.daily.live_snapshot | live snapshot: injected provisional 2026-08-06 rows for 99/100 symbols (1 skipped)",
+  "11:12:05 src.daily.features | daily features: 99 rows, present_share={'fno': 0.5858585858585857, 'global': 0.9090909090909088, 'macro': 0.0686868686868687, 'sentiment': 0.0}",
+  "11:12:06 src.daily.run_list | daily list 2026-08-06 swing_1_5d: 10 picks (actionable=False)"
  ],
  "result": {
-  "day": "2026-07-22",
-  "top_pick": {
-   "symbol": "PAYTM",
-   "direction": "LONG",
-   "prob": 0.5,
-   "tier": "TOP_PICK"
+  "day": "2026-08-06",
+  "data_provenance": {
+   "session_date": "2026-08-06",
+   "used_upstox_live": true,
+   "captured_at": "2026-08-06T11:12:06",
+   "source": "Upstox live intraday snapshot \u2014 PROVISIONAL (current price, NOT the final close; delivery %/OI absent)"
   },
+  "top_pick": {
+   "rank": 1,
+   "symbol": "SWIGGY",
+   "direction": "LONG",
+   "prob": 0.4744,
+   "action": "HOLD",
+   "color": "red",
+   "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+   "confidence_pct": 47.4,
+   "buy_price": 299.2,
+   "stop_price": 286.35,
+   "target_price": 312.05,
+   "duration_days": 5,
+   "qty_at_1L": 334,
+   "tier": "TOP_PICK",
+   "why": [
+    "India VIX (-)",
+    "USD index (+)",
+    "OI change (-)"
+   ]
+  },
+  "picks": [
+   {
+    "rank": 1,
+    "symbol": "SWIGGY",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 299.2,
+    "stop_price": 286.35,
+    "target_price": 312.05,
+    "duration_days": 5,
+    "qty_at_1L": 334
+   },
+   {
+    "rank": 2,
+    "symbol": "COFORGE",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 1782.0,
+    "stop_price": 1719.19,
+    "target_price": 1844.81,
+    "duration_days": 5,
+    "qty_at_1L": 56
+   },
+   {
+    "rank": 3,
+    "symbol": "TVSMOTOR",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 4406.4,
+    "stop_price": 4296.99,
+    "target_price": 4515.81,
+    "duration_days": 5,
+    "qty_at_1L": 22
+   },
+   {
+    "rank": 4,
+    "symbol": "PAYTM",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 1447.3,
+    "stop_price": 1397.85,
+    "target_price": 1496.75,
+    "duration_days": 5,
+    "qty_at_1L": 69
+   },
+   {
+    "rank": 5,
+    "symbol": "HCLTECH",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 1337.9,
+    "stop_price": 1300.06,
+    "target_price": 1375.74,
+    "duration_days": 5,
+    "qty_at_1L": 74
+   },
+   {
+    "rank": 6,
+    "symbol": "TECHM",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 1652.0,
+    "stop_price": 1609.09,
+    "target_price": 1694.91,
+    "duration_days": 5,
+    "qty_at_1L": 60
+   },
+   {
+    "rank": 7,
+    "symbol": "PERSISTENT",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 5515.5,
+    "stop_price": 5336.85,
+    "target_price": 5694.15,
+    "duration_days": 5,
+    "qty_at_1L": 18
+   },
+   {
+    "rank": 8,
+    "symbol": "TCS",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 2404.5,
+    "stop_price": 2334.29,
+    "target_price": 2474.71,
+    "duration_days": 5,
+    "qty_at_1L": 41
+   },
+   {
+    "rank": 9,
+    "symbol": "BAJAJ-AUTO",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 11686.0,
+    "stop_price": 11424.36,
+    "target_price": 11947.64,
+    "duration_days": 5,
+    "qty_at_1L": 8
+   },
+   {
+    "rank": 10,
+    "symbol": "KAYNES",
+    "direction": "LONG",
+    "prob": 0.4744,
+    "action": "HOLD",
+    "color": "red",
+    "confidence_label": "low / no proven edge \u2014 watch only, do not size up",
+    "confidence_pct": 47.4,
+    "buy_price": 3882.1,
+    "stop_price": 3751.33,
+    "target_price": 4012.87,
+    "duration_days": 5,
+    "qty_at_1L": 25
+   }
+  ],
   "n_picks": 10,
   "n_strong_signals": 0,
   "summary": {
-   "headline": "Session 2026-07-22: top pick PAYTM (LONG), 0 strong signal(s)",
+   "headline": "Session 2026-08-06: top pick SWIGGY (LONG), 0 strong signal(s)",
    "what_happened": [
-    "Today's (2026-07-23) NSE data is not published yet \u2014 analysed the last completed session (2026-07-22) instead.",
+    "\u26a0\ufe0f PROVISIONAL LIVE run: used an Upstox intraday snapshot for 2026-08-06 (prices are current, NOT the final close; delivery %/OI features are absent). Treat as a preview, not a final signal.",
     "Refreshed global/macro series (S&P, Nasdaq, crude, USD/INR, India VIX\u2026).",
     "Rebuilt the daily price panel for the top-100 universe.",
     "Scored all universe stocks with the swing model \u2192 ranked top 10 picks."
    ],
    "result_meaning": [
-    "TOP PICK = PAYTM (LONG) \u2014 rank #1 of the universe: the day's RELATIVE best, picked by model score + momentum tie-break.",
-    "Its calibrated P(win) is 0.500 vs the 0.80 strong-signal bar \u2192 NOT a high-confidence signal; the model's own gate marks it actionable=false.",
-    "Main drivers: India VIX move (+), USD index (+), overnight Nasdaq (-).",
-    "If traded anyway: entry next session open ~\u20b91267.0, target \u20b91316.96, stop \u20b91217.04, qty@\u20b91L 78, hold \u22645 days.",
+    "TOP PICK = SWIGGY (LONG) \u2014 rank #1 of the universe: the day's RELATIVE best, picked by model score + momentum tie-break.",
+    "Its calibrated P(win) is 0.474 vs the 0.80 strong-signal bar \u2192 NOT a high-confidence signal; the model's own gate marks it actionable=false.",
+    "Main drivers: India VIX (-), USD index (+), OI change (-).",
+    "If traded anyway: entry next session open ~\u20b9299.2, target \u20b9312.05, stop \u20b9286.35, qty@\u20b91L 334, hold \u22645 days.",
     "Strong signals fired: 0 (a macOS notification shouts if one ever does)."
    ],
    "next_steps": [
     "NSE publishes today's data ~18:30 IST \u2014 press \u25b6 Start (or let the 19:30 cron run) after that to get the pick for the NEXT session's open.",
-    "To dig deeper: type PAYTM into the Analyzer (left) for full evidence, news and the 1\u20135 day trade plan.",
+    "To dig deeper: type SWIGGY into the Analyzer (left) for full evidence, news and the 1\u20135 day trade plan.",
     "Track the pick's honesty over time: python main.py --mode daily-scoreboard."
    ]
   }

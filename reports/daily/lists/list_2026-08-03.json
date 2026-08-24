@@ -1,0 +1,268 @@
+{
+  "date": "2026-08-03",
+  "generated": "2026-08-04T10:08:17",
+  "horizons": {
+    "swing_1_5d": {
+      "actionable": false,
+      "picks": [
+        {
+          "rank": 1,
+          "symbol": "TECHM",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "OI change (+)",
+            "Asian markets (+)",
+            "India VIX (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/TECHM_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1649.0,
+          "entry_rule": "next session open",
+          "target_price": 1699.58,
+          "stop_price": 1598.42,
+          "target_pct": 3.07,
+          "stop_pct": 3.07,
+          "max_hold_days": 5,
+          "qty_ref": 60,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03067226890756303
+        },
+        {
+          "rank": 2,
+          "symbol": "BAJFINANCE",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "OI change (+)",
+            "Asian markets (+)",
+            "India VIX (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/BAJFINANCE_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1153.0,
+          "entry_rule": "next session open",
+          "target_price": 1181.9,
+          "stop_price": 1124.1,
+          "target_pct": 2.51,
+          "stop_pct": 2.51,
+          "max_hold_days": 5,
+          "qty_ref": 86,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.025065047701647875
+        },
+        {
+          "rank": 3,
+          "symbol": "EICHERMOT",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "OI change (+)",
+            "Asian markets (+)",
+            "India VIX (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/EICHERMOT_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 8050.0,
+          "entry_rule": "next session open",
+          "target_price": 8203.93,
+          "stop_price": 7896.07,
+          "target_pct": 1.91,
+          "stop_pct": 1.91,
+          "max_hold_days": 5,
+          "qty_ref": 12,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.019121561668145517
+        },
+        {
+          "rank": 4,
+          "symbol": "MUTHOOTFIN",
+          "direction": "LONG",
+          "prob": 0.5,
+          "why": [
+            "OI change (+)",
+            "Asian markets (+)",
+            "India VIX (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/MUTHOOTFIN_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 2890.9,
+          "entry_rule": "next session open",
+          "target_price": 2995.99,
+          "stop_price": 2785.81,
+          "target_pct": 3.64,
+          "stop_pct": 3.64,
+          "max_hold_days": 5,
+          "qty_ref": 34,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.0363529894298859
+        },
+        {
+          "rank": 5,
+          "symbol": "HCLTECH",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/HCLTECH_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1377.0,
+          "entry_rule": "next session open",
+          "target_price": 1420.34,
+          "stop_price": 1333.66,
+          "target_pct": 3.15,
+          "stop_pct": 3.15,
+          "max_hold_days": 5,
+          "qty_ref": 72,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03147629422139227
+        },
+        {
+          "rank": 6,
+          "symbol": "COFORGE",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/COFORGE_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 1768.0,
+          "entry_rule": "next session open",
+          "target_price": 1832.96,
+          "stop_price": 1703.04,
+          "target_pct": 3.67,
+          "stop_pct": 3.67,
+          "max_hold_days": 5,
+          "qty_ref": 56,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03674450549450549
+        },
+        {
+          "rank": 7,
+          "symbol": "PERSISTENT",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/PERSISTENT_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 5575.0,
+          "entry_rule": "next session open",
+          "target_price": 5776.34,
+          "stop_price": 5373.66,
+          "target_pct": 3.61,
+          "stop_pct": 3.61,
+          "max_hold_days": 5,
+          "qty_ref": 17,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03611531069827034
+        },
+        {
+          "rank": 8,
+          "symbol": "TVSMOTOR",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "OI change (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/TVSMOTOR_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 4389.0,
+          "entry_rule": "next session open",
+          "target_price": 4502.01,
+          "stop_price": 4275.99,
+          "target_pct": 2.57,
+          "stop_pct": 2.57,
+          "max_hold_days": 5,
+          "qty_ref": 22,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.025747811086156962
+        },
+        {
+          "rank": 9,
+          "symbol": "TCS",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/TCS_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 2473.7,
+          "entry_rule": "next session open",
+          "target_price": 2554.1,
+          "stop_price": 2393.3,
+          "target_pct": 3.25,
+          "stop_pct": 3.25,
+          "max_hold_days": 5,
+          "qty_ref": 40,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.032501920200509384
+        },
+        {
+          "rank": 10,
+          "symbol": "KAYNES",
+          "direction": "LONG",
+          "prob": 0.4742,
+          "why": [
+            "India VIX (-)",
+            "Asian markets (+)",
+            "US 10Y (-)"
+          ],
+          "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/KAYNES_swing_1_5d.png",
+          "actionable": false,
+          "ref_close": 3805.0,
+          "entry_rule": "next session open",
+          "target_price": 3937.27,
+          "stop_price": 3672.73,
+          "target_pct": 3.48,
+          "stop_pct": 3.48,
+          "max_hold_days": 5,
+          "qty_ref": 26,
+          "capital_ref_inr": 100000.0,
+          "atr_pct": 0.03476253050497468
+        }
+      ]
+    }
+  },
+  "top_pick": {
+    "rank": 1,
+    "symbol": "TECHM",
+    "direction": "LONG",
+    "prob": 0.5,
+    "why": [
+      "OI change (+)",
+      "Asian markets (+)",
+      "India VIX (-)"
+    ],
+    "chart_path": "/Users/abhijitbharatkakade/AI-MLOps-Solution/reports/daily/charts/2026-08-03/TECHM_swing_1_5d.png",
+    "actionable": false,
+    "ref_close": 1649.0,
+    "entry_rule": "next session open",
+    "target_price": 1699.58,
+    "stop_price": 1598.42,
+    "target_pct": 3.07,
+    "stop_pct": 3.07,
+    "max_hold_days": 5,
+    "qty_ref": 60,
+    "capital_ref_inr": 100000.0,
+    "atr_pct": 0.03067226890756303,
+    "horizon": "swing_1_5d",
+    "tier": "TOP_PICK",
+    "confidence_note": "rank #1 of the universe today by model score + momentum tie-break; calibrated P(win)=0.500 (below the 0.80 strong-signal bar). This is the day's RELATIVE best, not a high-confidence call \u2014 track the running hit rate before trusting it with capital."
+  },
+  "strong_signals": []
+}

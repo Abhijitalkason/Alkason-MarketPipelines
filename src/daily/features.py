@@ -8,7 +8,7 @@ Mirrors src/intraday/features.py conventions exactly:
     before that day (India EOD) or released on/before its close (global/macro),
     so the no-lookahead property test passes by construction.
 
-Decision model (next_day/swing): decision at day T's close (India EOD of T is
+Decision model (swing): decision at day T's close (India EOD of T is
 public after the close). Features use the adjusted daily series through T and
 global/macro with release_ts <= T close. Entry/label (in labeler.py) fill at the
 NEXT session open — never at the close you just observed.

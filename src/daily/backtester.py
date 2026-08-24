@@ -62,7 +62,7 @@ def _load_raw_panels(symbols: list[str]) -> dict[str, pd.DataFrame]:
     return out
 
 
-def build_dataset(start: date, end: date, horizon: str = "next_day") -> pd.DataFrame:
+def build_dataset(start: date, end: date, horizon: str = "swing_1_5d") -> pd.DataFrame:
     """Assemble one row per (symbol, decision day): daily features + triple-barrier
     label/pnl for `horizon`. Universe is point-in-time per day (survivorship-proof).
     """
@@ -196,7 +196,7 @@ def fit_fold(train_df: pd.DataFrame, tune: bool | None = None) -> tuple[DailyMod
 
 # ── the walk-forward run + staged gate ────────────────────────────────
 
-def run_backtest(start: date, end: date, horizon: str = "next_day",
+def run_backtest(start: date, end: date, horizon: str = "swing_1_5d",
                  capital_per_trade_inr: float = 100_000, tune: bool | None = None,
                  args_note: str = "") -> dict:
     cfg = load_daily_config()

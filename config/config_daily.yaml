@@ -9,9 +9,12 @@
 # before a list is framed as "actionable".
 
 live_data:                               # feature 2026-07-23 — optional Upstox intraday snapshot
-  enabled: false                         # OFF by default; pass --live or set true to run on a
-                                         # PROVISIONAL live bar instead of waiting for NSE EOD.
-                                         # Needs a valid UPSTOX_ACCESS_TOKEN (expires daily).
+  enabled: true                          # LIVE by default (user directive 2026-08-06): run on a
+                                         # PROVISIONAL Upstox live bar instead of waiting for NSE EOD.
+                                         # Needs a valid UPSTOX_ACCESS_TOKEN (expires daily ~03:30 IST);
+                                         # if the token is missing/expired the pipeline degrades
+                                         # GRACEFULLY back to the latest EOD session (see main.py
+                                         # cmd_daily_pipeline). Set false to force EOD-only.
   source: upstox                         # market-quote API — today's OHLC + current price + volume
   # NOTE: a live snapshot is a preview only — the close is not final and flow
   # features (delivery %, OI) don't exist intraday. See src/daily/live_snapshot.py.
@@ -22,6 +25,20 @@ universe:
   membership_file: data/reference/universe_top100.csv
   index_symbol: "TOP100_LIQUID"
   min_median_daily_turnover_lacs: 100      # liquidity floor for listing eligibility
+
+  # ── Market-cap eligibility ceiling (user directive 2026-07-30) ────────────────
+  # Only stocks whose market capitalisation is <= this many CRORE (₹ Cr) are
+  # eligible for the universe. Applied BEFORE the liquidity ranking, so the
+  # universe = the most-liquid / high-volume names AMONG stocks <= this cap
+  # (mid-cap-and-below focus; excludes the mega-caps). Change this ONE number to
+  # widen/narrow the size band; set to 0 (or null) to disable the cap entirely.
+  # Consumed at universe-build time (scripts/build_daily_universe.py ->
+  # src/v6/universe.monthly_pit_universe). See Aug26Plan.md §5 Stage 2 + §7A.
+  max_market_cap_cr: 50000
+  # Source of market cap (= shares outstanding × price). Must be PIT-honest for the
+  # backtest: trailing shares × as-of close, refreshed on the monthly rebuild —
+  # never today's cap applied to history (that would leak).
+  market_cap_file: data/reference/market_cap.csv
 
 data:
   bhavcopy_path: data/bhavcopy             # source eq_*/fo_* (already on disk, daily)
@@ -44,15 +61,6 @@ horizons:
     stop_atr: 1.0                          # −1.0 daily ATR stop (symmetric ⇒ 0.5 baseline)
     time_barrier_days: 5                   # exit at close of the 5th session
     embargo_days: 7                        # > horizon length (leakage trap)
-    costs_profile: delivery
-  next_day:                                # earlier experiment (M1 FAIL 2026-06-29/30)
-    enabled: false
-    path: daily_close
-    entry: next_open                       # fill at next session open
-    target_atr: 1.0
-    stop_atr: 1.0                          # symmetric ⇒ near sign(next-day return)
-    time_barrier_days: 1
-    embargo_days: 2                        # >= horizon length
     costs_profile: delivery
   swing_2_10d:
     enabled: false                         # Phase 3
@@ -118,7 +126,7 @@ gate:                                      # STAGED success gate (the heart of t
     stress_multiplier: 2.0                 # also pass at 2× cost stress
 
 costs:                                     # delivery (overnight) + intraday profiles
-  # delivery (next_day/swing): STT 0.1% BOTH sides, exchange/SEBI/stamp/GST, DP on sell,
+  # delivery (swing): STT 0.1% BOTH sides, exchange/SEBI/stamp/GST, DP on sell,
   # NO slippage/impact (we do not model microstructure at daily fills).
   brokerage_delivery_per_order_inr: 0      # discount-broker delivery brokerage (often 0)
   stt_delivery_pct: 0.001                  # 0.1% on buy AND sell (delivery equity)

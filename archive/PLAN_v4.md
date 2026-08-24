@@ -1,3 +1,5 @@
+> ⚠️ **EXPIRED — this plan is no longer active and has been superseded. Please check the current plan: [Aug26Plan.md](../Aug26Plan.md).**
+
 # PLAN v4 — 80% Fired-Signal Win Rate + Pre-Open Regime/News Channel (NSE Intraday)
 
 > **Project:** Intraday (1–2 hour window) selective trading-signal system for NSE large caps

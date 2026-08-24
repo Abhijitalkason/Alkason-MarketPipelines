@@ -1,3 +1,5 @@
+> ⚠️ **EXPIRED — this plan is no longer active and has been superseded. Please check the current plan: [Aug26Plan.md](../Aug26Plan.md).**
+
 # PLAN v4 — Implementation Status & Runbook
 
 > Companion to PLAN_v4.md. Records what is implemented, how it was verified, and

@@ -3,6 +3,11 @@ reconciliation (PLAN_v3 §6; v3_supplementry §3.6).
 
 Provider: Upstox (config data.provider; any other value fails loudly — no
 silently-wrong provider). Requires UPSTOX_ACCESS_TOKEN in environment / .env.
+Recommended value: a **1-year read-only Analytics Token** (Developer Apps →
+Analytics → Generate Token) — grants market-data GET APIs without a static IP
+and needs no daily refresh. A standard OAuth access token also works but expires
+daily at 03:30 IST. We only ever call read-only market-data GETs (never orders),
+so the Analytics Token covers this client completely.
 
 Bar storage: monthly parquet data/bars/<SYMBOL>/<YYYY-MM>.parquet with columns
 [ts, open, high, low, close, volume, capture_ts, provisional]. Timestamps are
@@ -55,8 +60,11 @@ class UpstoxFeed:
         token = os.getenv("UPSTOX_ACCESS_TOKEN", "")
         if not token:
             raise DataFeedError(
-                "UPSTOX_ACCESS_TOKEN not set. Create an app at developer.upstox.com, "
-                "complete the OAuth login once, and put the access token in .env"
+                "UPSTOX_ACCESS_TOKEN not set. Recommended: generate a 1-year "
+                "Analytics Token (developer.upstox.com → Developer Apps → Analytics "
+                "→ Generate Token) — read-only market data, no daily refresh — and "
+                "put it in .env as UPSTOX_ACCESS_TOKEN. (A standard OAuth access "
+                "token also works but expires daily at 03:30 IST.)"
             )
         self.session = requests.Session()
         self.session.headers.update({"Authorization": f"Bearer {token}", "Accept": "application/json"})
@@ -67,14 +75,27 @@ class UpstoxFeed:
     # ── auth ──────────────────────────────────────────────────────────
 
     def auth_ping(self) -> None:
-        """Cheap authenticated request. Run at 08:55 so a stale token fails
-        BEFORE market open, not at the first poll (G.5). See RUNBOOK.md for
-        the daily token-refresh procedure."""
-        resp = self.session.get(f"{UPSTOX_BASE}/user/profile", timeout=15)
+        """Cheap authenticated READ-ONLY market-data request. Uses a Market Quote
+        GET (LTP), NOT /user/profile — so it authenticates the 1-year Analytics
+        Token, which grants market-data GET APIs WITHOUT a static IP while the
+        Account APIs (/user/*) would require one. Run before the session so a
+        missing/expired token fails early, not at the first poll (G.5)."""
+        resp = self.session.get(
+            f"{UPSTOX_BASE}/market-quote/ltp",
+            params={"instrument_key": "NSE_INDEX|Nifty 50"},
+            timeout=15,
+        )
+        if resp.status_code in (401, 403):
+            raise DataFeedError(
+                f"Upstox auth ping failed (HTTP {resp.status_code}) — the "
+                "UPSTOX_ACCESS_TOKEN is missing or expired. Paste a fresh token in "
+                ".env (recommended: a 1-year Analytics Token — Developer Apps → "
+                "Analytics → Generate Token; no daily refresh needed)."
+            )
         if resp.status_code != 200:
             raise DataFeedError(
-                f"Upstox auth ping failed (HTTP {resp.status_code}) — refresh "
-                f"UPSTOX_ACCESS_TOKEN before the session (see RUNBOOK.md)"
+                f"Upstox auth ping failed (HTTP {resp.status_code}) — market-data "
+                "reachability/token check did not return 200."
             )
 
     # ── instrument master ─────────────────────────────────────────────
